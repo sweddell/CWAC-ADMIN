@@ -294,6 +294,28 @@ def get_scan_configs():
             pass
     return configs
 
+def _is_scan_dir_active(scan_dir):
+    """True if a results dir belongs to a scan currently in progress.
+
+    CWAC creates the results directory at the start of a scan but the
+    .scan_success marker is only written after the process exits, so a
+    running scan's directory must not be reported as failed.
+    """
+    try:
+        dir_mtime = datetime.fromtimestamp(scan_dir.stat().st_mtime)
+    except OSError:
+        return False
+    for progress in SCAN_PROGRESS.values():
+        if progress.get('status') in ('starting', 'running'):
+            start = progress.get('start_time')
+            if start:
+                try:
+                    if dir_mtime >= datetime.fromisoformat(start) - timedelta(seconds=5):
+                        return True
+                except ValueError:
+                    pass
+    return False
+
 def get_recent_results(limit=None):
     """Get recent scan results"""
     import csv
@@ -308,9 +330,15 @@ def get_recent_results(limit=None):
         for scan_dir in scan_dirs_to_process:
             mtime = datetime.fromtimestamp(scan_dir.stat().st_mtime)
             
-            # Check if scan succeeded or failed
+            # Check if scan succeeded or failed (a running scan's directory
+            # exists before its success marker is written)
             success_marker = scan_dir / '.scan_success'
-            status = 'completed' if success_marker.exists() else 'failed'
+            if success_marker.exists():
+                status = 'completed'
+            elif _is_scan_dir_active(scan_dir):
+                status = 'running'
+            else:
+                status = 'failed'
             
             # Count files and get summary from CWAC CSV files
             json_files = list(scan_dir.glob('*.json'))
@@ -1620,7 +1648,12 @@ def api_config_usage(filename):
             
             # Check if scan was successful
             success_marker = scan_dir / '.scan_success'
-            status = 'completed' if success_marker.exists() else 'error'
+            if success_marker.exists():
+                status = 'completed'
+            elif _is_scan_dir_active(scan_dir):
+                status = 'running'
+            else:
+                status = 'error'
             
             # Get scan timestamp from directory name or modification time
             try:
@@ -1672,7 +1705,7 @@ def api_config_usage(filename):
                 'start_time': start_time,
                 'end_time': end_time,
                 'duration': duration,
-                'message': 'Scan completed successfully' if status == 'completed' else 'Scan failed',
+                'message': 'Scan completed successfully' if status == 'completed' else ('Scan in progress' if status == 'running' else 'Scan failed'),
                 'error_details': None
             })
     

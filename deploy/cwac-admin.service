@@ -6,8 +6,11 @@ After=network.target
 User=cwacadmin
 WorkingDirectory=/opt/cwac-admin/cwac_admin_app/app
 EnvironmentFile=/opt/cwac-admin/.env
+# Single worker process is required: scan progress/active-scan state is held
+# in memory (SCAN_PROGRESS / ACTIVE_SCANS). Threads keep requests concurrent.
 ExecStart=/opt/cwac-admin/.venv/bin/gunicorn \
-    --workers 2 \
+    --workers 1 \
+    --threads 4 \
     --preload \
     --bind 0.0.0.0:5100 \
     --timeout 120 \
