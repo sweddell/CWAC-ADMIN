@@ -693,7 +693,7 @@ def setup_2fa():
     totp_uri = pyotp.TOTP(secret).provisioning_uri(
         name=current_user.username, issuer_name='CWAC Admin'
     )
-    qr_img = qrcode.make(totp_uri, image_factory=qrcode.image.svg.SvgImage)
+    qr_img = qrcode.make(totp_uri, image_factory=qrcode.image.svg.SvgPathImage)
     buf = io.BytesIO()
     qr_img.save(buf)
     qr_svg = buf.getvalue().decode('utf-8')
