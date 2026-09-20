@@ -1,0 +1,32 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}Recovery Codes - Centralised Web Accessibility Checker{% endblock %}
+{% block page_title %}<i class="bi bi-key"></i> Your Recovery Codes{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Save these codes now</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    Each code can be used <strong>once</strong> in place of your authenticator code.
+                    They are shown only now — store them somewhere safe (e.g. a password manager).
+                </div>
+                <div class="row row-cols-2 row-cols-md-4 g-2 mb-4">
+                    {% for code in recovery_codes %}
+                    <div class="col">
+                        <code class="d-block text-center border rounded py-2 user-select-all">{{ code }}</code>
+                    </div>
+                    {% endfor %}
+                </div>
+                <a href="{{ url_for('profile') }}" class="btn btn-primary">
+                    <i class="bi bi-check2"></i> I have saved my recovery codes
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

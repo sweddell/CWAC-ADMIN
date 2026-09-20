@@ -1,0 +1,44 @@
+/* GDPR cookie consent banner */
+#cookie-consent-banner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    background: #fff;
+    border-top: 1px solid #dee2e6;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+    padding: 1rem 0;
+}
+
+#cookie-consent-banner .cookie-consent-inner {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 0 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+}
+
+#cookie-consent-banner .cookie-consent-text {
+    flex: 1 1 480px;
+    font-size: 0.9rem;
+    color: #212529;
+    margin: 0;
+}
+
+#cookie-consent-banner .cookie-consent-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+@media (max-width: 576px) {
+    #cookie-consent-banner .cookie-consent-actions {
+        width: 100%;
+    }
+    #cookie-consent-banner .cookie-consent-actions .btn {
+        flex: 1;
+    }
+}

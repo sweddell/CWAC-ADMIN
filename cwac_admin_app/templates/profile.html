@@ -156,14 +156,41 @@
                 </h5>
             </div>
             <div class="card-body">
-                <div class="form-check form-switch mb-3">
-                    <input class="form-check-input" type="checkbox" id="twoFactorAuth" disabled>
-                    <label class="form-check-label" for="twoFactorAuth">
-                        Two-Factor Authentication
-                        <small class="text-muted d-block">Coming soon</small>
-                    </label>
+                <div class="mb-3">
+                    <strong>Two-Factor Authentication</strong>
+                    {% if current_user.totp_enabled %}
+                        <span class="badge bg-success ms-2">Enabled</span>
+                    {% else %}
+                        <span class="badge bg-secondary ms-2">Disabled</span>
+                    {% endif %}
                 </div>
-                <div class="form-check form-switch mb-3">
+                {% if current_user.totp_enabled %}
+                    <p class="text-muted small">Your account requires a TOTP code at sign-in.</p>
+                    <form method="POST" action="{{ url_for('regenerate_recovery_codes') }}" class="mb-2">
+                        <label for="regen_password" class="form-label small">Confirm password to regenerate recovery codes</label>
+                        <div class="input-group input-group-sm mb-2">
+                            <input type="password" class="form-control" id="regen_password" name="password" required>
+                            <button type="submit" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-repeat"></i> Regenerate
+                            </button>
+                        </div>
+                    </form>
+                    <form method="POST" action="{{ url_for('disable_2fa') }}">
+                        <label for="disable_password" class="form-label small">Confirm password to disable 2FA</label>
+                        <div class="input-group input-group-sm">
+                            <input type="password" class="form-control" id="disable_password" name="password" required>
+                            <button type="submit" class="btn btn-outline-danger">
+                                <i class="bi bi-shield-slash"></i> Disable
+                            </button>
+                        </div>
+                    </form>
+                {% else %}
+                    <p class="text-muted small">Require a time-based code from an authenticator app at sign-in.</p>
+                    <a href="{{ url_for('setup_2fa') }}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-shield-lock"></i> Enable Two-Factor Authentication
+                    </a>
+                {% endif %}
+                <div class="form-check form-switch mb-3 mt-3">
                     <input class="form-check-input" type="checkbox" id="emailNotifications" disabled>
                     <label class="form-check-label" for="emailNotifications">
                         Email Notifications

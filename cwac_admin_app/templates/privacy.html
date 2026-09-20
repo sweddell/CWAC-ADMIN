@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy &amp; Cookies - CWAC Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: #f5f6fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        .privacy-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 3rem 1rem;
+        }
+        .privacy-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            padding: 2.5rem;
+        }
+        .privacy-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 2.5rem;
+            border-radius: 15px 15px 0 0;
+            margin: -2.5rem -2.5rem 2rem;
+        }
+        h2 { font-size: 1.3rem; margin-top: 1.8rem; }
+        .table-cookies td, .table-cookies th { font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <main class="privacy-container">
+        <div class="privacy-card">
+            <div class="privacy-header">
+                <h1 class="h3 mb-1"><i class="bi bi-shield-check"></i> Privacy &amp; Cookie Policy</h1>
+                <p class="mb-0 small">CWAC Admin — Centralised Web Accessibility Checker</p>
+            </div>
+
+            <p class="text-muted small">Last updated: September 2026</p>
+
+            <h2>What this service does</h2>
+            <p>
+                CWAC Admin is an accessibility scanning platform. It crawls registered websites and
+                runs automated audits against them. Access is restricted to authorised users.
+            </p>
+
+            <h2>Personal data we process</h2>
+            <ul>
+                <li><strong>Account data</strong> — username, email address, organisation and an optional bio, provided at registration.</li>
+                <li><strong>Authentication data</strong> — a hashed password, and if you enable two-factor authentication a TOTP secret and hashed recovery codes.</li>
+                <li><strong>Scan data</strong> — results of automated audits of registered websites (URLs, page metadata and issue reports). These relate to websites, not individuals.</li>
+            </ul>
+            <p>We do not use tracking, analytics or advertising cookies, and we do not sell or share personal data with third parties.</p>
+
+            <h2>Cookies we use</h2>
+            <table class="table table-cookies table-bordered">
+                <thead>
+                    <tr><th>Cookie</th><th>Purpose</th><th>Duration</th><th>Type</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>cwac_admin_session_v2</code></td>
+                        <td>Sign-in session</td>
+                        <td>24 hours</td>
+                        <td>Strictly necessary</td>
+                    </tr>
+                    <tr>
+                        <td><code>remember_token</code></td>
+                        <td>Keeps you signed in between visits</td>
+                        <td>7 days</td>
+                        <td>Strictly necessary</td>
+                    </tr>
+                    <tr>
+                        <td><code>cwac_cookie_consent</code></td>
+                        <td>Remembers your cookie choice</td>
+                        <td>12 months</td>
+                        <td>Strictly necessary</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>
+                We currently set only strictly necessary cookies. If optional cookies are introduced
+                in future they will only be set after you choose “Accept all cookies” in the consent
+                banner. You can change your choice at any time by deleting the
+                <code>cwac_cookie_consent</code> cookie and reloading the page.
+            </p>
+
+            <h2>Legal basis &amp; retention</h2>
+            <p>
+                Account data is processed to provide the service (legitimate interest / contract).
+                Accounts are retained while the service is provided; contact the administrator to
+                have your account and associated personal data removed.
+            </p>
+
+            <h2>Your rights</h2>
+            <p>
+                You may request access to, correction of, or deletion of your personal data.
+                Contact the site administrator via the project website at
+                <a href="https://civica11y.com">civica11y.com</a>.
+            </p>
+
+            <div class="text-center mt-4">
+                <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-arrow-left"></i> Back to sign in
+                </a>
+            </div>
+        </div>
+    </main>
+    {% include '_cookie_banner.html' %}
+</body>
+</html>

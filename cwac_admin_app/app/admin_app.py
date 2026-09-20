@@ -18,11 +18,21 @@ import time
 import threading
 import shutil
 import re
+import secrets
 from datetime import datetime, timedelta
 import uuid
 from urllib.parse import unquote
 from typing import Dict, List, Any
 from dotenv import load_dotenv
+
+try:
+    import pyotp
+    import qrcode
+    import qrcode.image.svg
+    import io
+    TOTP_AVAILABLE = True
+except ImportError:
+    TOTP_AVAILABLE = False
 # Analytics uses JavaScript charts (no external dependencies)
 
 # Load environment variables from .env file
@@ -106,6 +116,7 @@ class User(UserMixin):
         self.status = status  # 'pending', 'active', 'deactivated'
         self.registered_date = registered_date or datetime.now().isoformat()
         self.bio = bio
+        self.totp_enabled = totp_enabled
 
 def load_users():
     """Load users from JSON file"""
@@ -152,7 +163,8 @@ def get_user_by_username(username):
             organization=user_data.get('organization'),
             status=user_data.get('status', 'active'),
             registered_date=user_data.get('registered_date'),
-            bio=user_data.get('bio')
+            bio=user_data.get('bio'),
+            totp_enabled=user_data.get('totp_enabled', False)
         )
     return None
 
@@ -170,7 +182,8 @@ def get_user_by_id(user_id):
                 organization=user_data.get('organization'),
                 status=user_data.get('status', 'active'),
                 registered_date=user_data.get('registered_date'),
-                bio=user_data.get('bio')
+                bio=user_data.get('bio'),
+                totp_enabled=user_data.get('totp_enabled', False)
             )
     return None
 
@@ -587,6 +600,10 @@ def login():
             elif user.status == 'deactivated':
                 flash('Your account has been deactivated. Please contact an administrator.', 'danger')
             elif user.status == 'active':
+                if user.totp_enabled:
+                    session['pending_2fa_user'] = user.username
+                    session['pending_2fa_next'] = request.args.get('next')
+                    return redirect(url_for('login_2fa'))
                 login_user(user, remember=True)  # Always remember
                 session.permanent = True  # Keep session alive
                 session.modified = True  # Mark session as modified
@@ -606,6 +623,143 @@ def logout():
     logout_user()
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('login'))
+
+# ======================== TWO-FACTOR AUTHENTICATION ========================
+
+RECOVERY_CODE_COUNT = 8
+
+def _hash_recovery_code(code):
+    """Hash a recovery code for storage (normalised to lowercase)."""
+    return generate_password_hash(code.lower(), method='pbkdf2:sha256')
+
+@app.route('/login/2fa', methods=['GET', 'POST'])
+def login_2fa():
+    """Second-factor challenge after a successful password check"""
+    pending_username = session.get('pending_2fa_user')
+    if not pending_username or current_user.is_authenticated:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        user = get_user_by_username(pending_username)
+        if not user:
+            session.pop('pending_2fa_user', None)
+            return redirect(url_for('login'))
+
+        code = request.form.get('code', '').strip().replace(' ', '')
+        users = load_users()
+        user_data = users.get(pending_username, {})
+        secret = user_data.get('totp_secret')
+
+        verified = False
+        if TOTP_AVAILABLE and secret and pyotp.TOTP(secret).verify(code, valid_window=1):
+            verified = True
+        elif code:
+            # Fall back to single-use recovery codes (stored hashed)
+            hashes = user_data.get('recovery_code_hashes', [])
+            for h in hashes:
+                if check_password_hash(h, code.lower()):
+                    verified = True
+                    hashes.remove(h)
+                    users[pending_username]['recovery_code_hashes'] = hashes
+                    save_users(users)
+                    flash('Recovery code used. It has been invalidated — consider regenerating your codes.', 'warning')
+                    break
+
+        if verified:
+            session.pop('pending_2fa_user', None)
+            next_page = session.pop('pending_2fa_next', None)
+            login_user(user, remember=True)
+            session.permanent = True
+            session.modified = True
+            return redirect(next_page) if next_page else redirect(url_for('index'))
+
+        flash('Invalid authentication or recovery code', 'danger')
+
+    return render_template('login_2fa.html')
+
+@app.route('/2fa/setup')
+@login_required
+def setup_2fa():
+    """Begin TOTP enrolment: show QR code and secret"""
+    if not TOTP_AVAILABLE:
+        flash('Two-factor authentication is not available on this installation (pyotp/qrcode not installed).', 'danger')
+        return redirect(url_for('profile'))
+    if current_user.totp_enabled:
+        flash('Two-factor authentication is already enabled.', 'info')
+        return redirect(url_for('profile'))
+
+    secret = pyotp.random_base32()
+    session['pending_totp_secret'] = secret
+    totp_uri = pyotp.TOTP(secret).provisioning_uri(
+        name=current_user.username, issuer_name='CWAC Admin'
+    )
+    qr_img = qrcode.make(totp_uri, image_factory=qrcode.image.svg.SvgImage)
+    buf = io.BytesIO()
+    qr_img.save(buf)
+    qr_svg = buf.getvalue().decode('utf-8')
+    return render_template('setup_2fa.html', totp_secret=secret, qr_svg=qr_svg)
+
+@app.route('/2fa/verify', methods=['POST'])
+@login_required
+def verify_2fa_setup():
+    """Confirm a TOTP code and enable 2FA for the current user"""
+    secret = session.pop('pending_totp_secret', None)
+    code = request.form.get('code', '').strip().replace(' ', '')
+
+    if not secret:
+        flash('Setup session expired — please start again.', 'danger')
+        return redirect(url_for('profile'))
+    if not (TOTP_AVAILABLE and pyotp.TOTP(secret).verify(code, valid_window=1)):
+        flash('Invalid code — two-factor authentication was not enabled.', 'danger')
+        return redirect(url_for('setup_2fa'))
+
+    recovery_codes = [secrets.token_hex(4) for _ in range(RECOVERY_CODE_COUNT)]
+    users = load_users()
+    users[current_user.username]['totp_secret'] = secret
+    users[current_user.username]['totp_enabled'] = True
+    users[current_user.username]['recovery_code_hashes'] = [_hash_recovery_code(c) for c in recovery_codes]
+    save_users(users)
+    return render_template('recovery_codes.html', recovery_codes=recovery_codes)
+
+@app.route('/2fa/disable', methods=['POST'])
+@login_required
+def disable_2fa():
+    """Disable 2FA after confirming the account password"""
+    password = request.form.get('password', '')
+    if not check_password_hash(current_user.password_hash, password):
+        flash('Incorrect password — two-factor authentication was not disabled.', 'danger')
+        return redirect(url_for('profile'))
+
+    users = load_users()
+    users[current_user.username].pop('totp_secret', None)
+    users[current_user.username].pop('recovery_code_hashes', None)
+    users[current_user.username]['totp_enabled'] = False
+    save_users(users)
+    flash('Two-factor authentication has been disabled.', 'success')
+    return redirect(url_for('profile'))
+
+@app.route('/2fa/recovery/regenerate', methods=['POST'])
+@login_required
+def regenerate_recovery_codes():
+    """Issue a fresh set of recovery codes (requires password)"""
+    if not current_user.totp_enabled:
+        flash('Two-factor authentication is not enabled.', 'danger')
+        return redirect(url_for('profile'))
+    password = request.form.get('password', '')
+    if not check_password_hash(current_user.password_hash, password):
+        flash('Incorrect password — recovery codes were not regenerated.', 'danger')
+        return redirect(url_for('profile'))
+
+    recovery_codes = [secrets.token_hex(4) for _ in range(RECOVERY_CODE_COUNT)]
+    users = load_users()
+    users[current_user.username]['recovery_code_hashes'] = [_hash_recovery_code(c) for c in recovery_codes]
+    save_users(users)
+    return render_template('recovery_codes.html', recovery_codes=recovery_codes)
+
+@app.route('/privacy')
+def privacy():
+    """Privacy and cookie policy (public)"""
+    return render_template('privacy.html')
 
 @app.route('/change-password', methods=['GET', 'POST'])
 @login_required

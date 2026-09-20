@@ -1,0 +1,45 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}Set Up Two-Factor Authentication - Centralised Web Accessibility Checker{% endblock %}
+{% block page_title %}<i class="bi bi-shield-lock"></i> Set Up Two-Factor Authentication{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-qr-code"></i> Step 1 — Add this account to your authenticator app</h5>
+            </div>
+            <div class="card-body">
+                <p>Scan the QR code with an authenticator app (e.g. 1Password, Authy, Google Authenticator), or enter the secret manually.</p>
+                <div class="text-center mb-3">
+                    <div style="display: inline-block; max-width: 220px;">{{ qr_svg | safe }}</div>
+                </div>
+                <div class="text-center">
+                    <code class="fs-6 user-select-all">{{ totp_secret }}</code>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-check2-circle"></i> Step 2 — Confirm a code</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('verify_2fa_setup') }}">
+                    <div class="mb-3">
+                        <label for="code" class="form-label">6-digit code from your authenticator</label>
+                        <input type="text" class="form-control" id="code" name="code"
+                               inputmode="numeric" autocomplete="one-time-code"
+                               style="max-width: 220px; font-size: 1.3rem; letter-spacing: 0.4em;" required autofocus>
+                    </div>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-shield-check"></i> Enable Two-Factor Authentication
+                    </button>
+                    <a href="{{ url_for('profile') }}" class="btn btn-outline-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

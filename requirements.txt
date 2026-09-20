@@ -25,6 +25,10 @@ python-dateutil==2.9.0.post0
 pytz==2025.2
 python-dotenv==1.0.1
 
+# Two-factor authentication (TOTP)
+pyotp==2.9.0
+qrcode==8.2
+
 # For CWAC Scanner Integration (subprocess calls)
 # See cwac/requirements.txt for complete CWAC dependencies
 # (cwac/ is cloned from https://github.com/GOVTNZ/cwac by install_cwac.sh)

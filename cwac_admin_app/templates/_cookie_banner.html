@@ -1,0 +1,20 @@
+{# GDPR cookie consent banner — include at the end of <body>. #}
+<div id="cookie-consent-banner" role="region" aria-label="Cookie consent" hidden>
+    <div class="cookie-consent-inner">
+        <p class="cookie-consent-text">
+            We use strictly necessary cookies to keep you signed in and keep the site secure.
+            With your consent we may also use optional cookies to improve the service.
+            See our <a href="{{ url_for('privacy') }}">privacy &amp; cookie policy</a>.
+        </p>
+        <div class="cookie-consent-actions">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-consent="essential">
+                Essential only
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" data-consent="accepted">
+                Accept all cookies
+            </button>
+        </div>
+    </div>
+</div>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/cookie-consent.css') }}">
+<script src="{{ url_for('static', filename='js/cookie-consent.js') }}" defer></script>
