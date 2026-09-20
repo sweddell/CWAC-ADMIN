@@ -102,11 +102,28 @@ USERS_FILE = PROJECT_ROOT / "admin" / "users.json"
 # Ensure directories exist
 (PROJECT_ROOT / "admin").mkdir(exist_ok=True)
 
+def sync_scan_configs():
+    """Mirror app scan configs into cwac/config/ where the engine reads them.
+
+    The admin app stores configs in PROJECT_ROOT/config/, but CWAC resolves
+    config filenames against ./config/ relative to the cwac/ working dir.
+    """
+    cwac_config_dir = PROJECT_ROOT / 'cwac' / 'config'
+    if not CONFIG_DIR.is_dir() or not cwac_config_dir.is_dir():
+        return
+    for cfg in CONFIG_DIR.glob('*.json'):
+        dest = cwac_config_dir / cfg.name
+        if not dest.exists() or dest.read_bytes() != cfg.read_bytes():
+            shutil.copy2(cfg, dest)
+            print(f"Synced scan config: {cfg.name}")
+
+sync_scan_configs()
+
 # ======================== USER AUTHENTICATION ========================
 
 class User(UserMixin):
     """User class for Flask-Login"""
-    def __init__(self, id, username, password_hash, is_admin=False, email=None, organization=None, status='active', registered_date=None, bio=None):
+    def __init__(self, id, username, password_hash, is_admin=False, email=None, organization=None, status='active', registered_date=None, bio=None, totp_enabled=False):
         self.id = id
         self.username = username
         self.password_hash = password_hash
