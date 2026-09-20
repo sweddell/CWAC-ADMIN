@@ -31,6 +31,17 @@ Security guidelines for deploying and operating CWAC-ADMIN.
 - Unique to this application
 - Use password manager
 
+### Two-Factor Authentication (2FA)
+
+The platform supports TOTP-based two-factor authentication:
+
+- Enable from **Profile → Security → Two-Factor Authentication**
+- Works with any TOTP authenticator app (Aegis, Google Authenticator, 1Password, etc.)
+- Enrollment displays a QR code plus a manual secret for apps without camera scanning
+- After password verification, a 6-digit code is required to complete login
+- 8 single-use recovery codes are generated at setup — store them somewhere safe
+- Disabling 2FA or regenerating recovery codes requires the account password
+
 ### Session Management
 
 **Configuration:**
@@ -450,10 +461,17 @@ sudo ufw deny from <IP_ADDRESS>
 ### Data Protection
 
 **GDPR Compliance:**
+
+Shipped controls:
+- Opt-in cookie consent banner on all pages ("Accept all" / "Essential only")
+- Privacy and cookie policy published at `/privacy`
+- Only strictly necessary cookies are set (session, remember-token, consent choice)
+
+Operator responsibilities:
 - Document data processing
 - Implement data retention policies
 - Provide data export/deletion
-- Maintain privacy policy
+- Review and maintain the privacy policy
 
 **Data Retention:**
 - Scan results: 90 days default

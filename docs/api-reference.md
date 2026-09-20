@@ -562,10 +562,14 @@ print(f"Scan started: {scan['scan_id']}")
 ### cURL
 
 ```bash
-# Login and save cookies
+# Login and save cookies (form-encoded)
 curl -c cookies.txt -X POST http://localhost:5001/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin"}'
+  -d 'username=admin' -d 'password=admin'
+
+# If the account has 2FA enabled, /login redirects to /login/2fa.
+# Submit the TOTP code with the same cookie jar to complete login:
+curl -b cookies.txt -c cookies.txt -X POST http://localhost:5001/login/2fa \
+  -d 'code=123456'
 
 # Get sites
 curl -b cookies.txt http://localhost:5001/api/sites

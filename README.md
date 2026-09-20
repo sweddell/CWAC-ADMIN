@@ -59,7 +59,12 @@ A professional web accessibility compliance management platform for auditing and
 - User registration and approval workflow
 - Password management
 
-### 🔌 Extensible Architecture
+### � Privacy & Security
+- **TOTP two-factor authentication** with single-use recovery codes
+- **Opt-in cookie consent** banner and privacy policy (GDPR)
+- Secure session cookies (HttpOnly, SameSite)
+
+### �🔌 Extensible Architecture
 - Custom audit plugins
 - REST API endpoints
 - SQLite database with comprehensive schema

@@ -83,6 +83,26 @@ sqlite3 cwac_analytics.db < schema.sql
    tail -f logs/audit.log
    ```
 
+### Running Scan Disappears or Shows as Failed
+
+**Problem**: A running scan vanishes from the running list, or appears as
+failed in scan history while it is still running, then shows as completed
+after a refresh.
+
+**Cause**: Scan progress is tracked in memory per process. Running Gunicorn
+with more than one worker splits that state, so status requests handled by a
+different worker cannot see the scan.
+
+**Solution**: Run a single worker with threads for concurrency (as the
+shipped `deploy/cwac-admin.service` does):
+
+```
+--workers 1 --threads 4
+```
+
+Horizontal scaling requires moving scan state to shared storage first —
+tracked on the roadmap under distributed scanning.
+
 ### "Connection Refused" Errors
 
 **Problem**: Scanner cannot reach target site
