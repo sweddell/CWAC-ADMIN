@@ -1,0 +1,509 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}Analytics Dashboard - Centralised Web Accessibility Checker{% endblock %}
+{% block page_title %}<i class="bi bi-graph-up"></i> Analytics Dashboard{% endblock %}
+{% block page_description %}<p class="text-muted mb-0" style="font-size: 0.9rem;">Real-time accessibility metrics and insights</p>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .metric-card {
+        transition: transform 0.2s;
+    }
+    .metric-card:hover {
+        transform: translateY(-2px);
+    }
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+    }
+    .metric-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .status-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Filters -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label class="form-label">Site Filter</label>
+                            <select id="filter-site" class="form-select">
+                                <option value="">All Sites</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Group Filter</label>
+                            <select id="filter-group" class="form-select">
+                                <option value="">All Groups</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Date Range</label>
+                            <select id="filter-date" class="form-select">
+                                <option value="7">Last 7 days</option>
+                                <option value="30" selected>Last 30 days</option>
+                                <option value="90">Last 90 days</option>
+                                <option value="365">Last year</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button class="btn btn-primary w-100" onclick="refreshData()">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card metric-card shadow-sm">
+                <div class="card-body text-center">
+                    <div class="metric-value text-primary" id="metric-total-scans">0</div>
+                    <div class="metric-label">Total Scans</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card shadow-sm">
+                <div class="card-body text-center">
+                    <div class="metric-value text-success" id="metric-compliant-sites">0</div>
+                    <div class="metric-label">Compliant Sites</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card shadow-sm">
+                <div class="card-body text-center">
+                    <div class="metric-value text-warning" id="metric-active-issues">0</div>
+                    <div class="metric-label">Active Issues</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card shadow-sm">
+                <div class="card-body text-center">
+                    <div class="metric-value text-info" id="metric-avg-score">0%</div>
+                    <div class="metric-label">Average Score</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 1 -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Compliance Trend</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="chart-compliance-trend"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">WCAG Levels</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="chart-wcag-levels"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 2 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Issues by Severity</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="chart-issues-severity"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Group Performance</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="chart-group-performance"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sites Table -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Sites Overview</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Organization</th>
+                                    <th>URL</th>
+                                    <th>Score</th>
+                                    <th>WCAG Level</th>
+                                    <th>Issues</th>
+                                    <th>Last Scan</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sites-table-body">
+                                <tr>
+                                    <td colspan="7" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+// Global chart instances
+let charts = {};
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCharts();
+    loadFilters();
+    refreshData();
+    
+    // Auto-refresh every 30 seconds
+    setInterval(function() {
+        refreshData();
+    }, 30000);
+});
+
+// Initialize all charts
+function initializeCharts() {
+    // Compliance Trend Chart
+    const ctxTrend = document.getElementById('chart-compliance-trend').getContext('2d');
+    charts.complianceTrend = new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Average Score',
+                data: [],
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1
+            }, {
+                label: 'Total Scans',
+                data: [],
+                borderColor: 'rgb(255, 159, 64)',
+                backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                yAxisID: 'y1',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    min: 0,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Score (%)'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                    title: {
+                        display: true,
+                        text: 'Scan Count'
+                    }
+                }
+            }
+        }
+    });
+
+    // WCAG Levels Chart
+    const ctxWcag = document.getElementById('chart-wcag-levels').getContext('2d');
+    charts.wcagLevels = new Chart(ctxWcag, {
+        type: 'doughnut',
+        data: {
+            labels: ['AAA', 'AA', 'A', 'Non-Compliant'],
+            datasets: [{
+                data: [0, 0, 0, 0],
+                backgroundColor: [
+                    'rgba(34, 139, 34, 0.8)',
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(255, 206, 86, 0.8)',
+                    'rgba(255, 99, 132, 0.8)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                }
+            }
+        }
+    });
+
+    // Issues by Severity Chart
+    const ctxIssues = document.getElementById('chart-issues-severity').getContext('2d');
+    charts.issuesSeverity = new Chart(ctxIssues, {
+        type: 'bar',
+        data: {
+            labels: ['Critical', 'Serious', 'Moderate', 'Minor'],
+            datasets: [{
+                label: 'Issue Count',
+                data: [0, 0, 0, 0],
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.8)',
+                    'rgba(255, 159, 64, 0.8)',
+                    'rgba(255, 206, 86, 0.8)',
+                    'rgba(75, 192, 192, 0.8)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+
+    // Group Performance Chart
+    const ctxGroup = document.getElementById('chart-group-performance').getContext('2d');
+    charts.groupPerformance = new Chart(ctxGroup, {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Average Score',
+                data: [],
+                backgroundColor: 'rgba(54, 162, 235, 0.8)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Score (%)'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Load filter options
+async function loadFilters() {
+    try {
+        // Load sites
+        const sitesResponse = await fetch('/api/sites');
+        const sites = await sitesResponse.json();
+        const siteSelect = document.getElementById('filter-site');
+        siteSelect.innerHTML = '<option value="">All Sites</option>';
+        sites.forEach(site => {
+            const option = document.createElement('option');
+            option.value = site.id;
+            option.textContent = site.organisation || site.url;
+            siteSelect.appendChild(option);
+        });
+
+        // Load groups
+        const groupsResponse = await fetch('/api/site-groups');
+        const groups = await groupsResponse.json();
+        const groupSelect = document.getElementById('filter-group');
+        groupSelect.innerHTML = '<option value="">All Groups</option>';
+        groups.forEach(group => {
+            const option = document.createElement('option');
+            option.value = group.id;
+            option.textContent = group.name;
+            groupSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Failed to load filters:', error);
+    }
+}
+
+
+// Refresh all data
+async function refreshData() {
+    const siteId = document.getElementById('filter-site').value;
+    const groupId = document.getElementById('filter-group').value;
+    const dateRange = document.getElementById('filter-date').value;
+    
+    const params = new URLSearchParams();
+    if (siteId) params.append('site_id', siteId);
+    if (groupId) params.append('group_id', groupId);
+    params.append('date_range', dateRange);
+    
+    try {
+        const response = await fetch(`/api/analytics/data?${params}`);
+        const data = await response.json();
+        
+        // Update metrics
+        document.getElementById('metric-total-scans').textContent = data.metrics.total_scans || 0;
+        document.getElementById('metric-compliant-sites').textContent = data.metrics.compliant_sites || 0;
+        document.getElementById('metric-active-issues').textContent = data.metrics.active_issues || 0;
+        document.getElementById('metric-avg-score').textContent = (data.metrics.average_score || 0) + '%';
+        
+        // Update compliance trend chart
+        if (data.compliance_trend && charts.complianceTrend) {
+            charts.complianceTrend.data.labels = data.compliance_trend.dates;
+            charts.complianceTrend.data.datasets[0].data = data.compliance_trend.scores;
+            charts.complianceTrend.data.datasets[1].data = data.compliance_trend.counts;
+            charts.complianceTrend.update();
+        }
+        
+        // Update WCAG levels chart
+        if (data.wcag_levels && charts.wcagLevels) {
+            charts.wcagLevels.data.datasets[0].data = [
+                data.wcag_levels.AAA || 0,
+                data.wcag_levels.AA || 0,
+                data.wcag_levels.A || 0,
+                data.wcag_levels['Non-Compliant'] || 0
+            ];
+            charts.wcagLevels.update();
+        }
+        
+        // Update issues severity chart
+        if (data.issues_breakdown && charts.issuesSeverity) {
+            charts.issuesSeverity.data.datasets[0].data = [
+                data.issues_breakdown.critical || 0,
+                data.issues_breakdown.serious || 0,
+                data.issues_breakdown.moderate || 0,
+                data.issues_breakdown.minor || 0
+            ];
+            charts.issuesSeverity.update();
+        }
+        
+        // Update group performance chart
+        if (data.group_performance && charts.groupPerformance) {
+            charts.groupPerformance.data.labels = data.group_performance.names;
+            charts.groupPerformance.data.datasets[0].data = data.group_performance.scores;
+            charts.groupPerformance.update();
+        }
+        
+        // Update sites table
+        updateSitesTable(data.sites_overview || []);
+        
+    } catch (error) {
+        console.error('Failed to refresh data:', error);
+    }
+}
+
+// Update sites table
+function updateSitesTable(sites) {
+    const tbody = document.getElementById('sites-table-body');
+    
+    if (sites.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">No data available</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = sites.map(site => {
+        const scoreClass = site.score >= 90 ? 'text-success' : site.score >= 70 ? 'text-warning' : 'text-danger';
+        const wcagBadgeClass = site.wcag_level === 'AAA' ? 'bg-success' : 
+                               site.wcag_level === 'AA' ? 'bg-info' : 
+                               site.wcag_level === 'A' ? 'bg-warning' : 'bg-danger';
+        
+        return `
+            <tr>
+                <td>${site.organisation || '-'}</td>
+                <td><a href="${site.url}" target="_blank">${site.url}</a></td>
+                <td class="${scoreClass}"><strong>${site.score || 0}%</strong></td>
+                <td><span class="badge ${wcagBadgeClass}">${site.wcag_level || 'N/A'}</span></td>
+                <td>${site.total_issues || 0}</td>
+                <td>${site.last_scan ? new Date(site.last_scan).toLocaleDateString() : 'Never'}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="viewSiteDetails('${site.url}')">
+                        <i class="bi bi-eye"></i> View
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// View site details
+function viewSiteDetails(siteUrl) {
+    window.location.href = `/sites/${encodeURIComponent(siteUrl)}`;
+}
+</script>
+{% endblock %}

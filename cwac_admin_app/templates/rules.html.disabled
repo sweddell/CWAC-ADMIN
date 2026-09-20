@@ -1,0 +1,626 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}Manage Rules - CWAC-ADMIN{% endblock %}
+{% block page_title %}Manage Rules{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1>
+            <i class="bi bi-list-check"></i> Accessibility Rules
+        </h1>
+        <p class="text-muted">Manage organization-specific accessibility rules and checks</p>
+        
+        <!-- WCAG Version Legend -->
+        <div class="alert alert-light border">
+            <strong>WCAG Version Coverage:</strong>
+            <span class="badge bg-primary" title="WCAG 2.0, 2.1, and 2.2">2.0</span> = Applies to WCAG 2.0, 2.1, and 2.2
+            &nbsp;&nbsp;|&nbsp;&nbsp;
+            <span class="badge bg-success" title="WCAG 2.1 and 2.2">2.1</span> = New in WCAG 2.1 (also in 2.2)
+            &nbsp;&nbsp;|&nbsp;&nbsp;
+            <span class="badge bg-info text-white" title="WCAG 2.2 only">2.2</span> = New in WCAG 2.2
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Custom Rules</h5>
+                    <button class="btn btn-success btn-sm" onclick="showAddRuleModal()">
+                        <i class="bi bi-plus-circle"></i> Add Rule
+                    </button>
+                </div>
+                
+                <!-- Bulk Actions -->
+                <div class="row g-2">
+                    <div class="col-12">
+                        <strong>Bulk Actions by WCAG Version:</strong>
+                    </div>
+                    <div class="col-auto">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-primary" onclick="bulkToggleVersion('2.0', true)" title="Enable all WCAG 2.0 rules">
+                                <i class="bi bi-check-circle"></i> Enable 2.0
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="bulkToggleVersion('2.0', false)" title="Disable all WCAG 2.0 rules">
+                                <i class="bi bi-x-circle"></i> Disable 2.0
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-success" onclick="bulkToggleVersion('2.1', true)" title="Enable all WCAG 2.1 rules">
+                                <i class="bi bi-check-circle"></i> Enable 2.1
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="bulkToggleVersion('2.1', false)" title="Disable all WCAG 2.1 rules">
+                                <i class="bi bi-x-circle"></i> Disable 2.1
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-info" onclick="bulkToggleVersion('2.2', true)" title="Enable all WCAG 2.2 rules">
+                                <i class="bi bi-check-circle"></i> Enable 2.2
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="bulkToggleVersion('2.2', false)" title="Disable all WCAG 2.2 rules">
+                                <i class="bi bi-x-circle"></i> Disable 2.2
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row g-2 mt-2">
+                    <div class="col-12">
+                        <strong>Bulk Actions by Level:</strong>
+                    </div>
+                    <div class="col-auto">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-warning" onclick="bulkToggleLevel('A', true)" title="Enable all Level A rules">
+                                <i class="bi bi-check-circle"></i> Enable Level A
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="bulkToggleLevel('A', false)" title="Disable all Level A rules">
+                                <i class="bi bi-x-circle"></i> Disable A
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-success" onclick="bulkToggleLevel('AA', true)" title="Enable all Level AA rules">
+                                <i class="bi bi-check-circle"></i> Enable Level AA
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="bulkToggleLevel('AA', false)" title="Disable all Level AA rules">
+                                <i class="bi bi-x-circle"></i> Disable AA
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-primary" onclick="bulkToggleLevel('AAA', true)" title="Enable all Level AAA rules">
+                                <i class="bi bi-check-circle"></i> Enable Level AAA
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="bulkToggleLevel('AAA', false)" title="Disable all Level AAA rules">
+                                <i class="bi bi-x-circle"></i> Disable AAA
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-auto ms-auto">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-success" onclick="bulkToggleAll(true)" title="Enable all custom rules">
+                                <i class="bi bi-check-all"></i> Enable All
+                            </button>
+                            <button class="btn btn-danger" onclick="bulkToggleAll(false)" title="Disable all custom rules">
+                                <i class="bi bi-x-circle"></i> Disable All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row" id="rules-container">
+                    <div class="col-12 text-center">Loading rules...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- WCAG Standard Rules -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-shield-check"></i> WCAG Standard Checks via Axe-Core</h5>
+                <div>
+                    <span class="badge bg-primary">2.0</span>
+                    <span class="badge bg-success">2.1</span>
+                    <span class="badge bg-info text-white">2.2</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> 
+                    CWAC automatically includes comprehensive <strong>WCAG 2.0, 2.1, and 2.2</strong> Level AA checks via axe-core.
+                    Custom rules above are additional checks specific to your organization.
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Included Checks:</h6>
+                        <ul>
+                            <li>Color contrast ratios</li>
+                            <li>Alternative text for images</li>
+                            <li>Keyboard navigation</li>
+                            <li>ARIA labels and roles</li>
+                            <li>Form labels and instructions</li>
+                            <li>Heading structure</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Additional Checks:</h6>
+                        <ul>
+                            <li>Language detection</li>
+                            <li>Text reflow at 320px</li>
+                            <li>Focus indicators</li>
+                            <li>Skip navigation links</li>
+                            <li>Landmark regions</li>
+                            <li>Error identification</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Rule Modal -->
+<div class="modal fade" id="ruleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ruleModalTitle">Add Custom Rule</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="ruleForm">
+                    <input type="hidden" id="rule-id" value="">
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="rule-name" class="form-label">Rule Name *</label>
+                                <input type="text" class="form-control" id="rule-name" required>
+                                <div class="form-text">Short, descriptive name for the rule</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="rule-enabled" class="form-label">Status</label>
+                                <select class="form-select" id="rule-enabled">
+                                    <option value="true">Enabled</option>
+                                    <option value="false">Disabled</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="rule-description" class="form-label">Description</label>
+                        <textarea class="form-control" id="rule-description" rows="3"></textarea>
+                        <div class="form-text">Detailed description of what this rule checks</div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="rule-category" class="form-label">Category</label>
+                                <select class="form-select" id="rule-category">
+                                    <option value="Navigation">Navigation</option>
+                                    <option value="Semantics">Semantics</option>
+                                    <option value="Forms">Forms</option>
+                                    <option value="Images">Images</option>
+                                    <option value="Color">Color & Contrast</option>
+                                    <option value="Language">Language</option>
+                                    <option value="Keyboard">Keyboard</option>
+                                    <option value="Structure">Structure</option>
+                                    <option value="Custom">Custom</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="rule-severity" class="form-label">Severity</label>
+                                <select class="form-select" id="rule-severity">
+                                    <option value="error">Error (Critical)</option>
+                                    <option value="warning">Warning (Important)</option>
+                                    <option value="notice">Notice (Minor)</option>
+                                    <option value="info">Info (Suggestion)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="rule-selector" class="form-label">CSS Selector (Optional)</label>
+                        <input type="text" class="form-control" id="rule-selector" placeholder="e.g., button, a[href], input[type='text']">
+                        <div class="form-text">Target specific elements for this rule</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="rule-code" class="form-label">Custom Check Code (Advanced)</label>
+                        <textarea class="form-control font-monospace" id="rule-code" rows="5" placeholder="// JavaScript code to check the rule
+// Return true if pass, false if fail"></textarea>
+                        <div class="form-text">Optional: JavaScript code for custom validation logic</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveRule()">Save Rule</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let rules = [];
+let editRuleId = null;
+
+$(document).ready(function() {
+    loadRules();
+});
+
+function loadRules() {
+    $.ajax({
+        url: '/api/rules',
+        method: 'GET',
+        success: function(data) {
+            rules = data;
+            displayRules();
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading rules:', error);
+            const container = $('#rules-container');
+            container.html('<div class="col-12 text-center text-danger">Error loading rules. Please refresh the page.</div>');
+        }
+    });
+}
+
+function getWCAGVersionBadges(rule) {
+    // Determine which WCAG versions this rule applies to based on criterion
+    const wcagCriterion = rule.wcag || '';
+    
+    // WCAG 2.2 new success criteria
+    const wcag22Criteria = ['2.4.11', '2.4.12', '2.4.13', '2.5.7', '2.5.8', '3.2.6', '3.3.7', '3.3.8', '3.3.9'];
+    
+    // WCAG 2.1 new success criteria
+    const wcag21Criteria = ['1.3.4', '1.3.5', '1.3.6', '1.4.10', '1.4.11', '1.4.12', '1.4.13', 
+                            '2.1.4', '2.5.1', '2.5.2', '2.5.3', '2.5.4', '2.5.5', '2.5.6', '4.1.3'];
+    
+    let badges = '';
+    
+    if (wcag22Criteria.includes(wcagCriterion)) {
+        // New in WCAG 2.2 - only applies to 2.2
+        badges = '<span class="badge bg-info text-white" title="WCAG 2.2 only">2.2</span>';
+    } else if (wcag21Criteria.includes(wcagCriterion)) {
+        // New in WCAG 2.1 - applies to 2.1 and 2.2
+        badges = `
+            <span class="badge bg-success" title="WCAG 2.1 and 2.2">2.1</span>
+            <span class="badge bg-info text-white" title="WCAG 2.1 and 2.2">2.2</span>
+        `;
+    } else if (wcagCriterion) {
+        // WCAG 2.0 criteria - applies to all versions
+        badges = `
+            <span class="badge bg-primary" title="WCAG 2.0, 2.1, and 2.2">2.0</span>
+            <span class="badge bg-success" title="WCAG 2.0, 2.1, and 2.2">2.1</span>
+            <span class="badge bg-info text-white" title="WCAG 2.0, 2.1, and 2.2">2.2</span>
+        `;
+    }
+    
+    return badges;
+}
+
+function displayRules() {
+    const container = $('#rules-container');
+    
+    if (rules.length === 0) {
+        container.html('<div class="col-12 text-center text-muted">No custom rules configured</div>');
+        return;
+    }
+    
+    let html = '';
+    rules.forEach(rule => {
+        const badgeClass = rule.enabled ? 'success' : 'secondary';
+        const severityClass = {
+            'error': 'danger',
+            'warning': 'warning',
+            'notice': 'info',
+            'info': 'light'
+        }[rule.severity] || 'secondary';
+        
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="card-title">${rule.name}</h6>
+                            <div>
+                                <span class="badge bg-${badgeClass} me-1">
+                                    ${rule.enabled ? 'Active' : 'Inactive'}
+                                </span>
+                                <span class="badge bg-${severityClass}">
+                                    ${rule.severity}
+                                </span>
+                            </div>
+                        </div>
+                        <p class="card-text text-muted small">${rule.description || 'No description'}</p>
+                        ${rule.wcag ? `<div class="mb-2"><small class="text-muted"><strong>WCAG ${rule.wcag}</strong> (Level ${rule.level || 'AA'})</small></div>` : ''}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <span class="badge bg-light text-dark me-1">${rule.category}</span>
+                                ${getWCAGVersionBadges(rule)}
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="editRule('${rule.id}')">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-warning" onclick="toggleRule('${rule.id}')">
+                                    <i class="bi bi-${rule.enabled ? 'pause' : 'play'}"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteRule('${rule.id}')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.html(html);
+}
+
+function showAddRuleModal() {
+    editRuleId = null;
+    $('#ruleModalTitle').text('Add Custom Rule');
+    $('#rule-id').val('');
+    $('#rule-name').val('');
+    $('#rule-description').val('');
+    $('#rule-category').val('Custom');
+    $('#rule-severity').val('warning');
+    $('#rule-enabled').val('true');
+    $('#rule-selector').val('');
+    $('#rule-code').val('');
+    $('#ruleModal').modal('show');
+}
+
+function editRule(ruleId) {
+    const rule = rules.find(r => r.id === ruleId);
+    if (!rule) return;
+    
+    editRuleId = ruleId;
+    $('#ruleModalTitle').text('Edit Rule');
+    $('#rule-id').val(rule.id);
+    $('#rule-name').val(rule.name);
+    $('#rule-description').val(rule.description || '');
+    $('#rule-category').val(rule.category);
+    $('#rule-severity').val(rule.severity);
+    $('#rule-enabled').val(rule.enabled.toString());
+    $('#rule-selector').val(rule.selector || '');
+    $('#rule-code').val(rule.code || '');
+    $('#ruleModal').modal('show');
+}
+
+function saveRule() {
+    const data = {
+        name: $('#rule-name').val(),
+        description: $('#rule-description').val(),
+        category: $('#rule-category').val(),
+        severity: $('#rule-severity').val(),
+        enabled: $('#rule-enabled').val() === 'true',
+        selector: $('#rule-selector').val(),
+        code: $('#rule-code').val()
+    };
+    
+    if (!data.name) {
+        alert('Please provide a rule name');
+        return;
+    }
+    
+    if (editRuleId) {
+        // Update existing rule
+        $.ajax({
+            url: `/api/rules/${editRuleId}`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function() {
+                $('#ruleModal').modal('hide');
+                loadRules();
+            }
+        });
+    } else {
+        // Add new rule
+        $.ajax({
+            url: '/api/rules',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function() {
+                $('#ruleModal').modal('hide');
+                loadRules();
+            }
+        });
+    }
+}
+
+function toggleRule(ruleId) {
+    const rule = rules.find(r => r.id === ruleId);
+    if (!rule) return;
+    
+    $.ajax({
+        url: `/api/rules/${ruleId}`,
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify({ enabled: !rule.enabled }),
+        success: function() {
+            loadRules();
+        }
+    });
+}
+
+function deleteRule(ruleId) {
+    const rule = rules.find(r => r.id === ruleId);
+    if (!rule) return;
+    
+    if (confirm(`Delete rule "${rule.name}"?`)) {
+        $.ajax({
+            url: `/api/rules/${ruleId}`,
+            method: 'DELETE',
+            success: function() {
+                loadRules();
+            }
+        });
+    }
+}
+
+function getRuleWCAGVersion(rule) {
+    // Determine which WCAG version(s) a rule belongs to
+    const wcagCriterion = rule.wcag || '';
+    
+    // WCAG 2.2 new success criteria
+    const wcag22Criteria = ['2.4.11', '2.4.12', '2.4.13', '2.5.7', '2.5.8', '3.2.6', '3.3.7', '3.3.8', '3.3.9'];
+    
+    // WCAG 2.1 new success criteria
+    const wcag21Criteria = ['1.3.4', '1.3.5', '1.3.6', '1.4.10', '1.4.11', '1.4.12', '1.4.13', 
+                            '2.1.4', '2.5.1', '2.5.2', '2.5.3', '2.5.4', '2.5.5', '2.5.6', '4.1.3'];
+    
+    if (wcag22Criteria.includes(wcagCriterion)) {
+        return ['2.2'];
+    } else if (wcag21Criteria.includes(wcagCriterion)) {
+        return ['2.1', '2.2'];
+    } else if (wcagCriterion) {
+        return ['2.0', '2.1', '2.2'];
+    }
+    return [];
+}
+
+function bulkToggleVersion(version, enable) {
+    const rulesToToggle = rules.filter(rule => {
+        const versions = getRuleWCAGVersion(rule);
+        return versions.includes(version);
+    });
+    
+    if (rulesToToggle.length === 0) {
+        alert(`No rules found for WCAG ${version}`);
+        return;
+    }
+    
+    const action = enable ? 'Enable' : 'Disable';
+    if (!confirm(`${action} ${rulesToToggle.length} rule(s) for WCAG ${version}?`)) {
+        return;
+    }
+    
+    let completed = 0;
+    rulesToToggle.forEach(rule => {
+        $.ajax({
+            url: `/api/rules/${rule.id}`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({ enabled: enable }),
+            success: function() {
+                completed++;
+                if (completed === rulesToToggle.length) {
+                    loadRules();
+                    alert(`Successfully ${enable ? 'enabled' : 'disabled'} ${completed} rule(s)`);
+                }
+            },
+            error: function() {
+                completed++;
+                if (completed === rulesToToggle.length) {
+                    loadRules();
+                }
+            }
+        });
+    });
+}
+
+function bulkToggleLevel(level, enable) {
+    const rulesToToggle = rules.filter(rule => {
+        return rule.level === level;
+    });
+    
+    if (rulesToToggle.length === 0) {
+        alert(`No rules found for Level ${level}`);
+        return;
+    }
+    
+    const action = enable ? 'Enable' : 'Disable';
+    if (!confirm(`${action} ${rulesToToggle.length} rule(s) for Level ${level}?`)) {
+        return;
+    }
+    
+    let completed = 0;
+    rulesToToggle.forEach(rule => {
+        $.ajax({
+            url: `/api/rules/${rule.id}`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({ enabled: enable }),
+            success: function() {
+                completed++;
+                if (completed === rulesToToggle.length) {
+                    loadRules();
+                    alert(`Successfully ${enable ? 'enabled' : 'disabled'} ${completed} rule(s)`);
+                }
+            },
+            error: function() {
+                completed++;
+                if (completed === rulesToToggle.length) {
+                    loadRules();
+                }
+            }
+        });
+    });
+}
+
+function bulkToggleAll(enable) {
+    if (rules.length === 0) {
+        alert('No rules to toggle');
+        return;
+    }
+    
+    const action = enable ? 'Enable' : 'Disable';
+    if (!confirm(`${action} all ${rules.length} rule(s)?`)) {
+        return;
+    }
+    
+    let completed = 0;
+    rules.forEach(rule => {
+        $.ajax({
+            url: `/api/rules/${rule.id}`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({ enabled: enable }),
+            success: function() {
+                completed++;
+                if (completed === rules.length) {
+                    loadRules();
+                    alert(`Successfully ${enable ? 'enabled' : 'disabled'} ${completed} rule(s)`);
+                }
+            },
+            error: function() {
+                completed++;
+                if (completed === rules.length) {
+                    loadRules();
+                }
+            }
+        });
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,391 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}Scan Sites - Centralised Web Accessibility Checker{% endblock %}
+{% block page_title %}<i class="bi bi-play-circle"></i> Run Accessibility Scan{% endblock %}
+{% block page_description %}<p class="text-muted mb-0" style="font-size: 0.9rem;">Configure and start accessibility scans</p>{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-search"></i> Start New Scan
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="scanForm">
+                    <div class="mb-3">
+                        <label for="scanType" class="form-label">Scan Type</label>
+                        <select class="form-select" id="scanType" onchange="updateScanOptions()">
+                            <option value="single">Single Site</option>
+                            <option value="multiple">Multiple Sites</option>
+                            <option value="all">All Sites</option>
+                        </select>
+                    </div>
+                    
+                    <div id="singleSiteOptions">
+                        <div class="mb-3">
+                            <label for="siteSelect" class="form-label">Select Site</label>
+                            <select class="form-select" id="siteSelect">
+                                <option value="">Loading sites...</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="multipleSiteOptions" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label">Select Sites</label>
+                            <div id="siteCheckboxes" class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+                                Loading sites...
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="configSelect" class="form-label">Configuration</label>
+                        <select class="form-select" id="configSelect">
+                            <option value="">Loading configurations...</option>
+                        </select>
+                    </div>
+                    
+                    <button type="button" class="btn btn-success" onclick="startScan()" id="startScanBtn">
+                        <i class="bi bi-play-circle"></i> Start Scan
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-info-circle"></i> Scan Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="small">
+                    <strong>Single Site:</strong> Scan one website at a time<br>
+                    <strong>Multiple Sites:</strong> Scan selected sites in sequence<br>
+                    <strong>All Sites:</strong> Scan all configured sites
+                </p>
+                <hr>
+                <p class="small mb-0">
+                    <i class="bi bi-clock"></i> Average scan time: 2-5 minutes per site
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Scans -->
+<div class="card mb-4">
+    <div class="card-header bg-warning text-dark">
+        <h5 class="mb-0">
+            <i class="bi bi-activity"></i> Active Scans
+        </h5>
+    </div>
+    <div class="card-body">
+        <div id="activeScans">
+            <p class="text-muted">No active scans</p>
+        </div>
+    </div>
+</div>
+
+<!-- Scan History -->
+<div class="card">
+    <div class="card-header bg-secondary text-white">
+        <h5 class="mb-0">
+            <i class="bi bi-clock-history"></i> Recent Scan History
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Scan ID</th>
+                        <th>Site</th>
+                        <th>Started</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                        <th>Score</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="scanHistory">
+                    <tr>
+                        <td colspan="7" class="text-center">Loading history...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let sites = [];
+let configs = [];
+let activeScansInterval = null;
+
+async function loadData() {
+    // Load sites
+    try {
+        const sitesResponse = await fetch('/api/sites');
+        sites = await sitesResponse.json();
+        updateSiteSelects();
+    } catch (error) {
+        console.error('Error loading sites:', error);
+    }
+    
+    // Load configurations
+    try {
+        const configsResponse = await fetch('/api/scan/configs');
+        configs = await configsResponse.json();
+        updateConfigSelect();
+    } catch (error) {
+        console.error('Error loading configs:', error);
+    }
+    
+    // Load scan history
+    loadScanHistory();
+    
+    // Load active scans
+    loadActiveScans();
+}
+
+function updateSiteSelects() {
+    // Update single site select
+    const siteSelect = document.getElementById('siteSelect');
+    siteSelect.innerHTML = '<option value="">Select a site...</option>' +
+        sites.map(site => `<option value="${site.url}">${site.organisation} - ${site.url}</option>`).join('');
+    
+    // Update multiple sites checkboxes
+    const checkboxes = document.getElementById('siteCheckboxes');
+    checkboxes.innerHTML = sites.map(site => `
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="${site.url}" id="site_${site.id}">
+            <label class="form-check-label" for="site_${site.id}">
+                ${site.organisation} - ${site.url}
+            </label>
+        </div>
+    `).join('');
+    
+    // Check if site was passed in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const siteParam = urlParams.get('site');
+    if (siteParam) {
+        siteSelect.value = siteParam;
+    }
+}
+
+function updateConfigSelect() {
+    const configSelect = document.getElementById('configSelect');
+    configSelect.innerHTML = '<option value="">Select configuration...</option>' +
+        configs.map(config => `<option value="${config.id}">${config.name}</option>`).join('');
+    
+    // Select default config if available
+    const defaultConfig = configs.find(c => c.is_default);
+    if (defaultConfig) {
+        configSelect.value = defaultConfig.id;
+    }
+}
+
+function updateScanOptions() {
+    const scanType = document.getElementById('scanType').value;
+    document.getElementById('singleSiteOptions').style.display = scanType === 'single' ? 'block' : 'none';
+    document.getElementById('multipleSiteOptions').style.display = scanType === 'multiple' ? 'block' : 'none';
+}
+
+async function startScan() {
+    const scanType = document.getElementById('scanType').value;
+    const configId = document.getElementById('configSelect').value;
+    
+    if (!configId) {
+        alert('Please select a configuration');
+        return;
+    }
+    
+    let sitesToScan = [];
+    
+    if (scanType === 'single') {
+        const siteUrl = document.getElementById('siteSelect').value;
+        if (!siteUrl) {
+            alert('Please select a site');
+            return;
+        }
+        sitesToScan = [siteUrl];
+    } else if (scanType === 'multiple') {
+        const checkboxes = document.querySelectorAll('#siteCheckboxes input:checked');
+        sitesToScan = Array.from(checkboxes).map(cb => cb.value);
+        if (sitesToScan.length === 0) {
+            alert('Please select at least one site');
+            return;
+        }
+    } else if (scanType === 'all') {
+        sitesToScan = sites.map(s => s.url);
+    }
+    
+    // Disable start button
+    const startBtn = document.getElementById('startScanBtn');
+    startBtn.disabled = true;
+    startBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting...';
+    
+    try {
+        const response = await fetch('/api/scan/start', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sites: sitesToScan,
+                config_id: configId
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            loadActiveScans();
+            loadScanHistory();
+            
+            // Start polling for active scans
+            if (!activeScansInterval) {
+                activeScansInterval = setInterval(() => {
+                    loadActiveScans();
+                    loadScanHistory();
+                }, 5000);
+            }
+        } else {
+            alert('Error starting scan');
+        }
+    } catch (error) {
+        console.error('Error starting scan:', error);
+        alert('Error starting scan');
+    } finally {
+        startBtn.disabled = false;
+        startBtn.innerHTML = '<i class="bi bi-play-circle"></i> Start Scan';
+    }
+}
+
+async function loadActiveScans() {
+    try {
+        const response = await fetch('/api/scan/active');
+        const activeScans = await response.json();
+        
+        const container = document.getElementById('activeScans');
+        
+        if (activeScans.length === 0) {
+            container.innerHTML = '<p class="text-muted">No active scans</p>';
+            // Stop polling if no active scans
+            if (activeScansInterval) {
+                clearInterval(activeScansInterval);
+                activeScansInterval = null;
+            }
+        } else {
+            container.innerHTML = activeScans.map(scan => `
+                <div class="border rounded p-3 mb-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${scan.site}</strong><br>
+                            <small class="text-muted">ID: ${scan.id}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-primary">
+                                ${scan.status}
+                            </span><br>
+                            <div class="progress mt-2" style="width: 100px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     style="width: ${scan.progress || 0}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-danger mt-2" onclick="stopScan('${scan.id}')">
+                        <i class="bi bi-stop-circle"></i> Stop
+                    </button>
+                </div>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Error loading active scans:', error);
+    }
+}
+
+async function loadScanHistory() {
+    try {
+        const response = await fetch('/api/scan/history');
+        const history = await response.json();
+        
+        const tbody = document.getElementById('scanHistory');
+        
+        if (history.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No scan history</td></tr>';
+        } else {
+            tbody.innerHTML = history.slice(0, 10).map(scan => `
+                <tr>
+                    <td><small>${scan.id.substring(0, 8)}...</small></td>
+                    <td>${scan.site}</td>
+                    <td>${new Date(scan.started).toLocaleString()}</td>
+                    <td>${scan.duration || '-'}</td>
+                    <td>
+                        <span class="badge bg-${scan.status === 'completed' ? 'success' : scan.status === 'failed' ? 'danger' : 'warning'}">
+                            ${scan.status}
+                        </span>
+                    </td>
+                    <td>
+                        ${scan.score ? `<span class="badge bg-${getScoreBadgeClass(scan.score)}">${scan.score}%</span>` : '-'}
+                    </td>
+                    <td>
+                        ${scan.status === 'completed' ? 
+                            `<button class="btn btn-sm btn-outline-primary" onclick="viewResults('${scan.id}')">
+                                <i class="bi bi-eye"></i>
+                            </button>` : '-'}
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Error loading scan history:', error);
+    }
+}
+
+async function stopScan(scanId) {
+    if (!confirm('Are you sure you want to stop this scan?')) return;
+    
+    try {
+        const response = await fetch(`/api/scan/stop/${scanId}`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            loadActiveScans();
+            loadScanHistory();
+        }
+    } catch (error) {
+        console.error('Error stopping scan:', error);
+    }
+}
+
+function viewResults(scanId) {
+    window.location.href = `/results?scan=${scanId}`;
+}
+
+function getScoreBadgeClass(score) {
+    if (score >= 90) return 'success';
+    if (score >= 70) return 'warning';
+    return 'danger';
+}
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', loadData);
+
+// Cleanup interval on page unload
+window.addEventListener('beforeunload', () => {
+    if (activeScansInterval) {
+        clearInterval(activeScansInterval);
+    }
+});
+</script>
+{% endblock %}

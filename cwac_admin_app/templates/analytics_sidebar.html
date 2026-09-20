@@ -1,0 +1,466 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}Analytics - Centralised Web Accessibility Checker{% endblock %}
+{% block page_title %}<i class="bi bi-graph-up"></i> Analytics Dashboard{% endblock %}
+{% block page_description %}<p class="text-muted mb-0" style="font-size: 0.9rem;">Real-time accessibility metrics and insights</p>{% endblock %}
+
+{% block top_actions %}
+<div class="btn-group btn-group-sm">
+    <button class="btn btn-outline-primary" onclick="refreshData()">
+        <i class="bi bi-arrow-clockwise"></i> Refresh
+    </button>
+    <button class="btn btn-outline-secondary" onclick="exportData()">
+        <i class="bi bi-download"></i> Export
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Date Range Filter -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-3">
+                        <label class="form-label">Date Range</label>
+                        <select class="form-select" id="dateRange" onchange="updateDateRange()">
+                            <option value="7">Last 7 Days</option>
+                            <option value="30" selected>Last 30 Days</option>
+                            <option value="90">Last 90 Days</option>
+                            <option value="365">Last Year</option>
+                            <option value="all">All Time</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Site Filter</label>
+                        <select class="form-select" id="siteFilter" onchange="updateFilters()">
+                            <option value="">All Sites</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Group Filter</label>
+                        <select class="form-select" id="groupFilter" onchange="updateFilters()">
+                            <option value="">All Groups</option>
+                            <option value="Government">Government</option>
+                            <option value="Education">Education</option>
+                            <option value="Healthcare">Healthcare</option>
+                            <option value="Commercial">Commercial</option>
+                            <option value="Non-Profit">Non-Profit</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">WCAG Level</label>
+                        <select class="form-select" id="wcagLevel" onchange="updateFilters()">
+                            <option value="">All Levels</option>
+                            <option value="A">Level A</option>
+                            <option value="AA">Level AA</option>
+                            <option value="AAA">Level AAA</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Key Metrics -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 id="avgScore" class="text-primary">0%</h3>
+                    <p>Average Score</p>
+                </div>
+                <i class="bi bi-speedometer2 text-primary" style="font-size: 2rem;"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 id="complianceRate" class="text-success">0%</h3>
+                    <p>Compliance Rate</p>
+                </div>
+                <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 id="totalScans" class="text-info">0</h3>
+                    <p>Total Scans</p>
+                </div>
+                <i class="bi bi-search text-info" style="font-size: 2rem;"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 id="totalIssues" class="text-warning">0</h3>
+                    <p>Total Issues</p>
+                </div>
+                <i class="bi bi-exclamation-triangle text-warning" style="font-size: 2rem;"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 1 -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="table-container">
+            <h5 class="mb-3">
+                <i class="bi bi-graph-up"></i> Compliance Trend
+            </h5>
+            <canvas id="complianceTrendChart" height="100"></canvas>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="table-container">
+            <h5 class="mb-3">
+                <i class="bi bi-pie-chart"></i> Issue Distribution
+            </h5>
+            <canvas id="issueDistributionChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 2 -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="table-container">
+            <h5 class="mb-3">
+                <i class="bi bi-bar-chart"></i> Sites by Score
+            </h5>
+            <canvas id="siteScoresChart" height="150"></canvas>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="table-container">
+            <h5 class="mb-3">
+                <i class="bi bi-list-ol"></i> Top Issues
+            </h5>
+            <div id="topIssuesList" style="max-height: 300px; overflow-y: auto;">
+                <div class="text-center text-muted">Loading...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Table -->
+<div class="table-container">
+    <h5 class="mb-3">
+        <i class="bi bi-table"></i> Site Performance Details
+    </h5>
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Site</th>
+                    <th>Group</th>
+                    <th>Last Scan</th>
+                    <th>Score</th>
+                    <th>Trend</th>
+                    <th>Critical</th>
+                    <th>Serious</th>
+                    <th>Moderate</th>
+                    <th>Minor</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="performanceTableBody">
+                <tr>
+                    <td colspan="10" class="text-center">Loading data...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Use minified Chart.js without source map to avoid console errors -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Global variables
+let analyticsData = null;
+let charts = {};
+
+// Initialize
+async function initAnalytics() {
+    await loadSites();
+    await loadAnalyticsData();
+}
+
+async function loadSites() {
+    try {
+        const response = await fetch('/api/sites');
+        const sites = await response.json();
+        
+        const siteFilter = document.getElementById('siteFilter');
+        siteFilter.innerHTML = '<option value="">All Sites</option>' +
+            sites.map(site => `<option value="${site.id}">${site.organisation} - ${site.url}</option>`).join('');
+    } catch (error) {
+        console.error('Error loading sites:', error);
+    }
+}
+
+async function loadAnalyticsData() {
+    try {
+        const params = new URLSearchParams({
+            date_range: document.getElementById('dateRange').value,
+            site_id: document.getElementById('siteFilter').value,
+            group_id: document.getElementById('groupFilter').value,
+            wcag_level: document.getElementById('wcagLevel').value
+        });
+        
+        const response = await fetch(`/api/analytics/data?${params}`);
+        analyticsData = await response.json();
+        
+        updateMetrics();
+        updateCharts();
+        updateTables();
+    } catch (error) {
+        console.error('Error loading analytics data:', error);
+        // Show error message
+        document.getElementById('performanceTableBody').innerHTML = 
+            '<tr><td colspan="10" class="text-center text-danger">Error loading analytics data</td></tr>';
+    }
+}
+
+function updateMetrics() {
+    if (!analyticsData) return;
+    
+    // Average Score
+    document.getElementById('avgScore').textContent = 
+        analyticsData.average_score ? Math.round(analyticsData.average_score) + '%' : '0%';
+    
+    // Compliance Rate
+    document.getElementById('complianceRate').textContent = 
+        analyticsData.compliance_rate ? Math.round(analyticsData.compliance_rate) + '%' : '0%';
+    
+    // Total Scans
+    document.getElementById('totalScans').textContent = 
+        analyticsData.total_scans || 0;
+    
+    // Total Issues
+    document.getElementById('totalIssues').textContent = 
+        analyticsData.total_issues || 0;
+}
+
+function updateCharts() {
+    if (!analyticsData) return;
+    
+    // Destroy existing charts
+    Object.values(charts).forEach(chart => chart.destroy());
+    charts = {};
+    
+    // Compliance Trend Chart
+    const ctx1 = document.getElementById('complianceTrendChart');
+    if (ctx1 && analyticsData.trend_data) {
+        charts.complianceTrend = new Chart(ctx1.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: analyticsData.trend_data.dates || [],
+                datasets: [{
+                    label: 'Average Score',
+                    data: analyticsData.trend_data.scores || [],
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Issue Distribution Chart
+    const ctx2 = document.getElementById('issueDistributionChart');
+    if (ctx2 && analyticsData.issue_distribution) {
+        const dist = analyticsData.issue_distribution;
+        charts.issueDistribution = new Chart(ctx2.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Critical', 'Serious', 'Moderate', 'Minor'],
+                datasets: [{
+                    data: [
+                        dist.critical || 0,
+                        dist.serious || 0,
+                        dist.moderate || 0,
+                        dist.minor || 0
+                    ],
+                    backgroundColor: ['#dc3545', '#fd7e14', '#ffc107', '#6c757d']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+    
+    // Sites by Score Chart
+    const ctx3 = document.getElementById('siteScoresChart');
+    if (ctx3 && analyticsData.site_scores) {
+        const sites = analyticsData.site_scores.slice(0, 10); // Top 10 sites
+        charts.siteScores = new Chart(ctx3.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: sites.map(s => s.site_name || s.site_url),
+                datasets: [{
+                    label: 'Score',
+                    data: sites.map(s => s.score || 0),
+                    backgroundColor: sites.map(s => 
+                        s.score >= 90 ? '#28a745' : 
+                        s.score >= 70 ? '#ffc107' : '#dc3545'
+                    )
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function updateTables() {
+    if (!analyticsData) return;
+    
+    // Top Issues List
+    const topIssuesList = document.getElementById('topIssuesList');
+    if (analyticsData.top_issues && analyticsData.top_issues.length > 0) {
+        topIssuesList.innerHTML = analyticsData.top_issues.map((issue, index) => `
+            <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
+                <div>
+                    <span class="badge bg-${getSeverityBadgeClass(issue.severity)} me-2">${index + 1}</span>
+                    <span>${issue.description || issue.rule}</span>
+                </div>
+                <span class="badge bg-secondary">${issue.count}</span>
+            </div>
+        `).join('');
+    } else {
+        topIssuesList.innerHTML = '<div class="text-center text-muted">No issues found</div>';
+    }
+    
+    // Performance Table
+    const tbody = document.getElementById('performanceTableBody');
+    if (analyticsData.site_performance && analyticsData.site_performance.length > 0) {
+        tbody.innerHTML = analyticsData.site_performance.map(site => `
+            <tr>
+                <td><a href="${site.site_url}" target="_blank">${site.site_url}</a></td>
+                <td>${site.group || '-'}</td>
+                <td>${site.last_scan ? new Date(site.last_scan).toLocaleDateString() : 'Never'}</td>
+                <td>
+                    <span class="badge bg-${getScoreBadgeClass(site.score)}">${site.score || 0}%</span>
+                </td>
+                <td>
+                    ${site.trend === 'up' ? '<i class="bi bi-arrow-up text-success"></i>' :
+                      site.trend === 'down' ? '<i class="bi bi-arrow-down text-danger"></i>' :
+                      '<i class="bi bi-dash text-muted"></i>'}
+                </td>
+                <td class="text-danger">${site.critical_issues || 0}</td>
+                <td class="text-warning">${site.serious_issues || 0}</td>
+                <td class="text-info">${site.moderate_issues || 0}</td>
+                <td class="text-secondary">${site.minor_issues || 0}</td>
+                <td>
+                    <span class="badge bg-${site.score >= 90 ? 'success' : 'warning'}">
+                        ${site.score >= 90 ? 'Compliant' : 'Issues'}
+                    </span>
+                </td>
+            </tr>
+        `).join('');
+    } else {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center">No data available</td></tr>';
+    }
+}
+
+function getScoreBadgeClass(score) {
+    if (score >= 90) return 'success';
+    if (score >= 70) return 'warning';
+    return 'danger';
+}
+
+function getSeverityBadgeClass(severity) {
+    switch(severity?.toLowerCase()) {
+        case 'critical': return 'danger';
+        case 'serious': return 'warning';
+        case 'moderate': return 'info';
+        case 'minor': return 'secondary';
+        default: return 'light';
+    }
+}
+
+function updateDateRange() {
+    loadAnalyticsData();
+}
+
+function updateFilters() {
+    loadAnalyticsData();
+}
+
+function refreshData() {
+    loadAnalyticsData();
+}
+
+function exportData() {
+    const params = new URLSearchParams({
+        date_range: document.getElementById('dateRange').value,
+        site_id: document.getElementById('siteFilter').value,
+        group_id: document.getElementById('groupFilter').value,
+        wcag_level: document.getElementById('wcagLevel').value,
+        format: 'csv'
+    });
+    
+    window.open(`/api/analytics/export?${params}`, '_blank');
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', initAnalytics);
+
+// Auto-refresh every 30 seconds
+setInterval(refreshData, 30000);
+</script>
+{% endblock %}

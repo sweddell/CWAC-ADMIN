@@ -1,0 +1,179 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}User Management - Centralised Web Accessibility Checker{% endblock %}
+{% block page_title %}<i class="bi bi-people"></i> User Management{% endblock %}
+
+{% block extra_css %}
+<style>
+    .user-card {
+        transition: transform 0.2s;
+    }
+    .user-card:hover {
+        transform: translateY(-2px);
+    }
+    .status-badge {
+        font-size: 0.875rem;
+        padding: 0.25rem 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+                <!-- Pending Approvals -->
+                {% if pending_users %}
+                <div class="card mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="bi bi-clock-history"></i> Pending Approvals ({{ pending_users|length }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for user in pending_users %}
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="card user-card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-person-circle"></i> {{ user.username }}
+                                        </h6>
+                                        <p class="card-text small">
+                                            <strong>Email:</strong> {{ user.email }}<br>
+                                            <strong>Organization:</strong> {{ user.organization }}<br>
+                                            <strong>Registered:</strong> {{ user.registered_date }}
+                                        </p>
+                                        <div class="d-flex gap-2">
+                                            <form method="POST" action="{{ url_for('approve_user', username=user.username) }}" class="flex-fill">
+                                                <button type="submit" class="btn btn-success btn-sm w-100">
+                                                    <i class="bi bi-check-circle"></i> Approve
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="{{ url_for('reject_user', username=user.username) }}" class="flex-fill">
+                                                <button type="submit" class="btn btn-danger btn-sm w-100" 
+                                                        onclick="return confirm('Are you sure you want to reject this user?')">
+                                                    <i class="bi bi-x-circle"></i> Reject
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Active Users -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-people-fill"></i> Active Users
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Email</th>
+                                        <th>Organization</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for user in active_users %}
+                                    <tr>
+                                        <td>
+                                            <i class="bi bi-person-circle"></i> {{ user.username }}
+                                            {% if user.username == current_user.username %}
+                                            <span class="badge bg-info ms-1">You</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ user.email }}</td>
+                                        <td>{{ user.organization }}</td>
+                                        <td>
+                                            {% if user.is_admin %}
+                                            <span class="badge bg-danger">Admin</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">User</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge status-badge bg-success">Active</span>
+                                        </td>
+                                        <td>
+                                            {% if user.username != current_user.username %}
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                {% if not user.is_admin %}
+                                                <form method="POST" action="{{ url_for('make_admin', username=user.username) }}" class="d-inline">
+                                                    <button type="submit" class="btn btn-outline-primary btn-sm" title="Make Admin">
+                                                        <i class="bi bi-shield-check"></i>
+                                                    </button>
+                                                </form>
+                                                {% else %}
+                                                <form method="POST" action="{{ url_for('remove_admin', username=user.username) }}" class="d-inline">
+                                                    <button type="submit" class="btn btn-outline-warning btn-sm" title="Remove Admin">
+                                                        <i class="bi bi-shield-x"></i>
+                                                    </button>
+                                                </form>
+                                                {% endif %}
+                                                <form method="POST" action="{{ url_for('deactivate_user', username=user.username) }}" class="d-inline">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm" 
+                                                            onclick="return confirm('Are you sure you want to deactivate this user?')"
+                                                            title="Deactivate">
+                                                        <i class="bi bi-person-x"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                            {% else %}
+                                            <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistics -->
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-primary">{{ stats.total_users }}</h3>
+                                <p class="text-muted mb-0">Total Users</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-success">{{ stats.active_users }}</h3>
+                                <p class="text-muted mb-0">Active Users</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-warning">{{ stats.pending_users }}</h3>
+                                <p class="text-muted mb-0">Pending Approval</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-danger">{{ stats.admin_users }}</h3>
+                                <p class="text-muted mb-0">Administrators</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+{% endblock %}

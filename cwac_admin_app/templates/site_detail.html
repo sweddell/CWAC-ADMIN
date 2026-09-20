@@ -1,0 +1,1109 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}{{ site_name }} - Site Details - Centralised Web Accessibility Checker{% endblock %}
+{% block page_title %}<i class="bi bi-globe"></i> {{ site_name }}{% endblock %}
+{% block page_description %}<p class="text-muted mb-0" style="font-size: 0.9rem;">{{ site_url }}</p>{% endblock %}
+
+{% block extra_css %}
+<style>
+.metric-card {
+    transition: transform 0.2s;
+}
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.trend-icon {
+    font-size: 2rem;
+}
+.compliance-badge {
+    font-size: 1.25rem;
+    padding: 0.5rem 1rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Back Button -->
+<div class="mb-3">
+    <a href="{{ url_for('sites') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Sites
+    </a>
+</div>
+
+<!-- Loading State -->
+<div id="loading-state" class="text-center my-5">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading site results...</span>
+    </div>
+    <p class="mt-3 text-muted">Loading site analytics...</p>
+</div>
+
+<!-- Site Results Content -->
+<div id="site-results-content" style="display: none;">
+    
+    <!-- WCAG Compliance Alert -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info text-center" id="compliance-section">
+                <h5 class="mb-3">WCAG Compliance Status</h5>
+                <div id="compliance-badges"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Summary Statistics -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card metric-card text-center h-100">
+                <div class="card-body">
+                    <i class="bi bi-clipboard-data text-primary" style="font-size: 2rem;"></i>
+                    <h3 class="card-title mt-2 mb-0" id="total-scans">0</h3>
+                    <p class="card-text text-muted">Total Scans</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card metric-card text-center h-100">
+                <div class="card-body">
+                    <i class="bi bi-bug text-warning" style="font-size: 2rem;"></i>
+                    <h3 class="card-title mt-2 mb-0" id="avg-issues">0</h3>
+                    <p class="card-text text-muted">Avg Issues</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card metric-card text-center h-100">
+                <div class="card-body">
+                    <i class="bi bi-graph-up text-success" style="font-size: 2rem;"></i>
+                    <h3 class="card-title mt-2 mb-0"><span id="compliance-score">0</span>%</h3>
+                    <p class="card-text text-muted">Compliance Score</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card metric-card text-center h-100">
+                <div class="card-body">
+                    <div class="trend-icon" id="trend-icon">→</div>
+                    <h5 class="card-title mt-2 mb-0" id="trend-text">Stable</h5>
+                    <p class="card-text text-muted">Trend</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Scans -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Scans</h5>
+                </div>
+                <div class="card-body">
+                    <div id="recent-scans-content">
+                        <p class="text-center text-muted">No scan results found for this site</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Detailed Analytics Tabs -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link cwac-tab active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab">
+                                <i class="bi bi-grid"></i> Overview
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link cwac-tab" id="accessibility-tab" data-bs-toggle="tab" data-bs-target="#accessibility" type="button" role="tab">
+                                <i class="bi bi-universal-access"></i> Accessibility
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content">
+                        <!-- Overview Tab -->
+                        <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                            <!-- Score Trends -->
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <h5 class="card-title mb-3"><i class="bi bi-graph-up"></i> Score Trends</h5>
+                                    <div id="site-trends-loading" class="text-center py-3">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading trends...</span>
+                                        </div>
+                                        <span class="text-muted ms-2">Loading historical data...</span>
+                                    </div>
+                                    <div id="site-trends-empty" class="text-center py-3 text-muted" style="display: none;">
+                                        <i class="bi bi-info-circle"></i> Not enough historical data available yet
+                                    </div>
+                                    <div id="site-trends-charts" class="row" style="display: none;">
+                                        <div class="col-md-12 mb-3 mb-md-0">
+                                            <div class="text-center mb-2">
+                                                <strong class="text-primary">Accessibility Score</strong>
+                                            </div>
+                                            <div style="height: 200px; position: relative;">
+                                                <canvas id="site-accessibility-trend-chart"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Search Targets -->
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                        <input type="text" class="form-control" placeholder="Search targets..." id="search-targets">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Page Targets Table -->
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover align-middle">
+                                            <thead>
+                                                <tr>
+                                                    <th>Target</th>
+                                                    <th>Status</th>
+                                                    <th>Score</th>
+                                                    <th>Issues</th>
+                                                    <th>Last Scan</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="page-targets-list">
+                                                <!-- Placeholder targets will be loaded here -->
+                                                <tr>
+                                                    <td>
+                                                        <div>
+                                                            <strong>Homepage</strong>
+                                                            <a href="#" class="ms-1" target="_blank"><i class="bi bi-box-arrow-up-right small"></i></a>
+                                                        </div>
+                                                        <small class="text-muted">https://agency.gov</small>
+                                                    </td>
+                                                    <td><span class="badge bg-success"><i class="bi bi-check-circle"></i> Complete</span></td>
+                                                    <td><span class="badge bg-success" style="font-size: 1rem; padding: 0.5rem;">92</span></td>
+                                                    <td>
+                                                        <span class="badge bg-danger me-1">2C</span>
+                                                        <span class="badge bg-warning me-1">5S</span>
+                                                        <span class="badge bg-info">8M</span>
+                                                    </td>
+                                                    <td><small class="text-muted">2 hours ago</small></td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-primary" onclick="viewPageResults('homepage', 'Homepage', 'https://agency.gov')">
+                                                            View Results
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>
+                                                        <div>
+                                                            <strong>Services</strong>
+                                                            <a href="#" class="ms-1" target="_blank"><i class="bi bi-box-arrow-up-right small"></i></a>
+                                                        </div>
+                                                        <small class="text-muted">https://agency.gov/services</small>
+                                                    </td>
+                                                    <td><span class="badge bg-info"><i class="bi bi-arrow-repeat"></i> Scanning</span></td>
+                                                    <td><span class="text-muted">—</span></td>
+                                                    <td><span class="text-muted">—</span></td>
+                                                    <td><small class="text-muted">In progress</small></td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-secondary" disabled>
+                                                            Scanning...
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>
+                                                        <div>
+                                                            <strong>Contact</strong>
+                                                            <a href="#" class="ms-1" target="_blank"><i class="bi bi-box-arrow-up-right small"></i></a>
+                                                        </div>
+                                                        <small class="text-muted">https://agency.gov/contact</small>
+                                                    </td>
+                                                    <td><span class="badge bg-warning"><i class="bi bi-check-circle"></i> Complete</span></td>
+                                                    <td><span class="badge bg-warning" style="font-size: 1rem; padding: 0.5rem;">87</span></td>
+                                                    <td>
+                                                        <span class="badge bg-danger me-1">1C</span>
+                                                        <span class="badge bg-warning me-1">3S</span>
+                                                        <span class="badge bg-info">6M</span>
+                                                    </td>
+                                                    <td><small class="text-muted">1 day ago</small></td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-primary" onclick="viewPageResults('contact', 'Contact', 'https://agency.gov/contact')">
+                                                            View Results
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>
+                                                        <div>
+                                                            <strong>About</strong>
+                                                            <a href="#" class="ms-1" target="_blank"><i class="bi bi-box-arrow-up-right small"></i></a>
+                                                        </div>
+                                                        <small class="text-muted">https://agency.gov/about</small>
+                                                    </td>
+                                                    <td><span class="badge bg-danger"><i class="bi bi-x-circle"></i> Failed</span></td>
+                                                    <td><span class="text-muted">—</span></td>
+                                                    <td><span class="text-muted">—</span></td>
+                                                    <td><small class="text-muted">3 days ago</small></td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-danger" disabled>
+                                                            Scan Failed
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Accessibility Tab -->
+                        <!-- Accessibility Tab -->
+                        <div class="tab-pane fade" id="accessibility" role="tabpanel">
+                            <!-- Accessibility Score Overview -->
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h6 class="card-title">Overall Accessibility Score</h6>
+                                    <div class="row align-items-center">
+                                        <div class="col-md-2 text-center">
+                                            <div class="circular-score" id="circular-score">
+                                                <svg width="120" height="120">
+                                                    <circle cx="60" cy="60" r="50" fill="none" stroke="#e9ecef" stroke-width="10"/>
+                                                    <circle id="score-circle" cx="60" cy="60" r="50" fill="none" stroke="#ffc107" stroke-width="10" 
+                                                            stroke-dasharray="314" stroke-dashoffset="314" transform="rotate(-90 60 60)"/>
+                                                    <text x="60" y="70" text-anchor="middle" font-size="32" font-weight="bold" id="score-text">0</text>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-10">
+                                            <div class="mb-3">
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <strong>Critical Issues</strong>
+                                                    <span class="badge bg-danger rounded-pill" id="critical-count">0</span>
+                                                </div>
+                                                <div class="progress" style="height: 8px;">
+                                                    <div class="progress-bar bg-danger" id="critical-bar" style="width: 0%"></div>
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <strong>Serious Issues</strong>
+                                                    <span class="badge bg-secondary rounded-pill" id="serious-count">0</span>
+                                                </div>
+                                                <div class="progress" style="height: 8px;">
+                                                    <div class="progress-bar bg-secondary" id="serious-bar" style="width: 0%"></div>
+                                                </div>
+                                            </div>
+                                            <div class="mb-0">
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <strong>Passed Tests</strong>
+                                                    <span class="badge bg-info rounded-pill" id="passed-count">0</span>
+                                                </div>
+                                                <div class="progress" style="height: 8px;">
+                                                    <div class="progress-bar bg-info" id="passed-bar" style="width: 0%"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Accessibility Sub-tabs -->
+                            <ul class="nav nav-pills mb-3" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link cwac-tab active" id="issues-subtab" data-bs-toggle="pill" data-bs-target="#issues-content" type="button" role="tab">
+                                        Issues
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link cwac-tab" id="passed-subtab" data-bs-toggle="pill" data-bs-target="#passed-content" type="button" role="tab">
+                                        Passed
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link cwac-tab" id="pages-subtab" data-bs-toggle="pill" data-bs-target="#pages-content" type="button" role="tab">
+                                        Pages
+                                    </button>
+                                </li>
+                            </ul>
+                            
+                            <div class="tab-content">
+                                <!-- Issues Sub-tab -->
+                                <div class="tab-pane fade show active" id="issues-content" role="tabpanel">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="mb-0">
+                                            <strong>Accessibility Issues</strong>
+                                            <span class="text-muted" id="issues-subtitle">40 issues found across the site</span>
+                                        </h6>
+                                        <div>
+                                            <i class="bi bi-funnel"></i>
+                                            <select class="form-select form-select-sm d-inline-block w-auto" id="severity-filter">
+                                                <option value="all">All Severity</option>
+                                                <option value="critical">Critical</option>
+                                                <option value="serious">Serious</option>
+                                                <option value="moderate">Moderate</option>
+                                                <option value="minor">Minor</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div id="accessibility-issues-list">
+                                        <p class="text-center text-muted py-4">No issues data available</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- Passed Sub-tab -->
+                                <div class="tab-pane fade" id="passed-content" role="tabpanel">
+                                    <h6 class="mb-3">
+                                        <strong>Passed Tests</strong>
+                                        <span class="text-muted" id="passed-subtitle">156 tests passed successfully</span>
+                                    </h6>
+                                    <div id="passed-tests-list">
+                                        <p class="text-center text-muted py-4">No passed tests data available</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- Pages Sub-tab -->
+                                <div class="tab-pane fade" id="pages-content" role="tabpanel">
+                                    <h6 class="mb-3">
+                                        <strong>Scanned Pages</strong>
+                                        <span class="text-muted" id="pages-subtitle">8 pages analyzed</span>
+                                    </h6>
+                                    <div id="scanned-pages-list">
+                                        <p class="text-center text-muted py-4">No pages data available</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Error State -->
+<div id="error-state" style="display: none;">
+    <div class="alert alert-danger text-center">
+        <i class="bi bi-exclamation-circle" style="font-size: 3rem;"></i>
+        <h4 class="mt-3">Failed to Load Site Results</h4>
+        <p>There was an error loading the analytics for this site.</p>
+        <a href="{{ url_for('sites') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Sites
+        </a>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Site Data Container -->
+<div id="site-data" style="display: none;"
+     data-site-id="{{ site_id }}"
+     data-site-url="{{ site_url }}"
+     data-site-name="{{ site_name }}">
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+// Get site data from data attributes
+const siteDataEl = document.getElementById('site-data');
+const siteId = parseInt(siteDataEl.dataset.siteId);
+const siteUrl = siteDataEl.dataset.siteUrl;
+const siteName = siteDataEl.dataset.siteName;
+
+$(document).ready(function() {
+    loadSiteResults();
+    loadPageTargets();
+    loadAccessibilityData();
+    loadSiteTrends();
+});
+
+function loadSiteResults() {
+    $.ajax({
+        url: '/api/sites/' + siteId + '/results',
+        method: 'GET',
+        success: function(data) {
+            displaySiteResults(data);
+            $('#loading-state').hide();
+            $('#site-results-content').show();
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading site results:', error);
+            $('#loading-state').hide();
+            $('#error-state').show();
+        }
+    });
+}
+
+function loadPageTargets() {
+    $.ajax({
+        url: '/api/sites/' + siteId + '/pages',
+        method: 'GET',
+        success: function(data) {
+            displayPageTargets(data.pages || []);
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading page targets:', error);
+            $('#page-targets-list').html('<tr><td colspan="6" class="text-center text-danger">Error loading pages</td></tr>');
+        }
+    });
+}
+
+function displaySiteResults(data) {
+    // Update summary stats
+    $('#total-scans').text(data.total_scans || 0);
+    $('#avg-issues').text(data.avg_issues || 0);
+    $('#compliance-score').text(data.score || 0);
+    
+    // Update trend
+    const trend = data.trend || 'stable';
+    const trendIcon = $('#trend-icon');
+    const trendText = $('#trend-text');
+    
+    if (trend === 'improving') {
+        trendIcon.text('↑').removeClass().addClass('trend-icon text-success');
+        trendText.text('Improving').removeClass().addClass('card-title mt-2 mb-0 text-success');
+    } else if (trend === 'declining') {
+        trendIcon.text('↓').removeClass().addClass('trend-icon text-danger');
+        trendText.text('Declining').removeClass().addClass('card-title mt-2 mb-0 text-danger');
+    } else {
+        trendIcon.text('→').removeClass().addClass('trend-icon text-muted');
+        trendText.text('Stable').removeClass().addClass('card-title mt-2 mb-0 text-muted');
+    }
+    
+    // Display WCAG compliance with cascading levels
+    displayComplianceBadges(data.compliance_level);
+    
+    // Display recent scans
+    displayRecentScans(data.recent_scans);
+    
+    // Display top issues
+    displayTopIssues(data.top_issues);
+    
+    // Update accessibility tabs
+    updateAccessibilityTabs(data);
+}
+
+function displayComplianceBadges(compliance) {
+    let badgesHtml = '';
+    let cascadingLevels = '';
+    
+    if (typeof compliance === 'object' && compliance.primary_level) {
+        const primary = compliance.primary_level;
+        const levels = compliance.compliant_levels || [];
+        
+        // Primary badge
+        if (primary === 'WCAG 2.2 AAA') {
+            badgesHtml = '<span class="badge bg-success compliance-badge">WCAG 2.2 AAA</span>';
+        } else if (primary === 'WCAG 2.2 AA') {
+            badgesHtml = '<span class="badge bg-success compliance-badge">WCAG 2.2 AA</span>';
+        } else if (primary === 'WCAG 2.2 A') {
+            badgesHtml = '<span class="badge bg-warning compliance-badge">WCAG 2.2 A</span>';
+        } else if (primary === 'Not scanned') {
+            badgesHtml = '<span class="badge bg-secondary compliance-badge">Not Scanned</span>';
+        } else {
+            badgesHtml = '<span class="badge bg-danger compliance-badge">Non-compliant</span>';
+        }
+        
+        // Cascading levels
+        if (levels.length > 0) {
+            const otherLevels = levels.filter(l => l !== primary);
+            if (otherLevels.length > 0) {
+                cascadingLevels = `
+                    <div class="mt-3">
+                        <p class="mb-2"><strong>Also meets:</strong></p>
+                        <div>
+                            ${otherLevels.map(l => `<span class="badge bg-light text-dark me-1 mb-1" style="font-size: 0.9rem;">${l}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    } else {
+        // Legacy string format
+        if (compliance === 'WCAG 2.2 AAA') {
+            badgesHtml = '<span class="badge bg-success compliance-badge">WCAG 2.2 AAA</span>';
+        } else if (compliance === 'WCAG 2.2 AA') {
+            badgesHtml = '<span class="badge bg-success compliance-badge">WCAG 2.2 AA</span>';
+        } else if (compliance === 'WCAG 2.2 A') {
+            badgesHtml = '<span class="badge bg-warning compliance-badge">WCAG 2.2 A</span>';
+        } else if (compliance === 'Not scanned') {
+            badgesHtml = '<span class="badge bg-secondary compliance-badge">Not Scanned</span>';
+        } else {
+            badgesHtml = '<span class="badge bg-danger compliance-badge">Non-compliant</span>';
+        }
+    }
+    
+    $('#compliance-badges').html(badgesHtml + cascadingLevels);
+}
+
+function displayRecentScans(scans) {
+    if (!scans || scans.length === 0) {
+        $('#recent-scans-content').html('<p class="text-center text-muted">No scan results found for this site</p>');
+        return;
+    }
+    
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Pages</th>
+                        <th>Total Issues</th>
+                        <th>Critical</th>
+                        <th>Serious</th>
+                        <th>Moderate</th>
+                        <th>Minor</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    scans.forEach(scan => {
+        const date = new Date(scan.date);
+        const scoreClass = scan.score >= 85 ? 'success' : scan.score >= 70 ? 'warning' : 'danger';
+        
+        html += `
+            <tr>
+                <td>${date.toLocaleDateString()} ${date.toLocaleTimeString()}</td>
+                <td>${scan.pages_scanned || 0}</td>
+                <td><span class="badge bg-info">${scan.total_issues || 0}</span></td>
+                <td><span class="badge bg-danger">${scan.critical || 0}</span></td>
+                <td><span class="badge bg-warning">${scan.serious || 0}</span></td>
+                <td><span class="badge bg-secondary">${scan.moderate || 0}</span></td>
+                <td><span class="badge bg-light text-dark">${scan.minor || 0}</span></td>
+                <td><span class="badge bg-${scoreClass}">${scan.score || 0}%</span></td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    $('#recent-scans-content').html(html);
+}
+
+function displayTopIssues(issues) {
+    if (!issues || issues.length === 0) {
+        $('#top-issues-content').html('<p class="text-center text-muted">No issues found</p>');
+        return;
+    }
+    
+    let html = '<div class="list-group">';
+    
+    issues.forEach(issue => {
+        const impactClass = issue.impact === 'critical' ? 'danger' : 
+                          issue.impact === 'serious' ? 'warning' : 
+                          issue.impact === 'moderate' ? 'info' : 'secondary';
+        const impactIcon = issue.impact === 'critical' ? 'exclamation-circle' : 
+                          issue.impact === 'serious' ? 'exclamation-triangle' : 
+                          issue.impact === 'moderate' ? 'info-circle' : 'dash-circle';
+        
+        html += `
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1">
+                            <i class="bi bi-${impactIcon} text-${impactClass}"></i>
+                            ${issue.description}
+                        </h6>
+                        <p class="mb-1 text-muted small">
+                            <code>${issue.id}</code>
+                        </p>
+                    </div>
+                    <div class="ms-3">
+                        <span class="badge bg-${impactClass}" style="font-size: 1rem; padding: 0.5rem 0.75rem;">
+                            ${issue.count}
+                        </span>
+                        <small class="d-block text-muted text-center mt-1">instances</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    
+    $('#top-issues-content').html(html);
+}
+
+// Placeholder function for future implementation
+// This will be populated with actual accessibility data from scan results
+function updateAccessibilityTabs(data) {
+    // Update circular score
+    const score = data.score || 0;
+    $('#score-text').text(score);
+    
+    // Calculate progress bar percentages (simple visualization)
+    const critical = data.recent_scans && data.recent_scans[0] ? data.recent_scans[0].critical : 0;
+    const serious = data.recent_scans && data.recent_scans[0] ? data.recent_scans[0].serious : 0;
+    const totalIssues = data.recent_scans && data.recent_scans[0] ? data.recent_scans[0].total_issues : 100;
+    
+    const criticalPercent = totalIssues > 0 ? (critical / totalIssues * 100) : 0;
+    const seriousPercent = totalIssues > 0 ? (serious / totalIssues * 100) : 0;
+    
+    $('#critical-count').text(critical);
+    $('#serious-count').text(serious);
+    $('#passed-count').text('N/A');
+    
+    $('#critical-bar').css('width', criticalPercent + '%');
+    $('#serious-bar').css('width', seriousPercent + '%');
+    $('#passed-bar').css('width', '80%'); // Placeholder
+    
+    // Update circular progress
+    const circumference = 314;
+    const offset = circumference - (score / 100 * circumference);
+    $('#score-circle').css('stroke-dashoffset', offset);
+    
+    // Set color based on score
+    let color = '#dc3545'; // red
+    if (score >= 85) color = '#28a745'; // green
+    else if (score >= 70) color = '#ffc107'; // yellow
+    $('#score-circle').attr('stroke', color);
+    
+    // Placeholder messages for tabs
+    $('#issues-subtitle').text(`Issues will be displayed here (Latest scan: ${totalIssues} total)`);
+    $('#passed-subtitle').text('Passed tests will be displayed here');
+    $('#pages-subtitle').text(`${data.recent_scans ? data.recent_scans[0].pages_scanned : 0} pages analyzed`);
+}
+
+// Store pages data globally for access by view function
+let currentPagesData = [];
+
+// Display page targets in Overview tab
+function displayPageTargets(pages) {
+    if (!pages || pages.length === 0) {
+        $('#page-targets-list').html('<tr><td colspan="6" class="text-center text-muted">No pages scanned yet</td></tr>');
+        return;
+    }
+    
+    // Store pages data globally
+    currentPagesData = pages;
+    
+    const html = pages.map((page, index) => {
+        // Status badge
+        const statusBadge = page.status === 'complete' 
+            ? '<span class="badge bg-success"><i class="bi bi-check-circle"></i> Complete</span>'
+            : '<span class="badge bg-info"><i class="bi bi-arrow-repeat"></i> Scanning</span>';
+        
+        // Score badge
+        const scoreClass = page.score >= 90 ? 'bg-success' : page.score >= 70 ? 'bg-warning' : 'bg-danger';
+        const scoreBadge = page.status === 'complete'
+            ? `<span class="badge ${scoreClass}" style="font-size: 1rem; padding: 0.5rem;">${page.score}</span>`
+            : '<span class="text-muted">—</span>';
+        
+        // Issues badges
+        const issuesBadges = page.status === 'complete'
+            ? `<span class="badge bg-danger me-1">${page.critical}C</span>
+               <span class="badge bg-warning me-1">${page.serious}S</span>
+               <span class="badge bg-info">${page.moderate}M</span>`
+            : '<span class="text-muted">—</span>';
+        
+        // Time ago
+        const lastScan = page.last_scan ? getTimeAgo(new Date(page.last_scan)) : 'Never';
+        
+        // Action button - use index to reference stored data
+        const actionButton = page.status === 'complete'
+            ? `<button class="btn btn-sm btn-primary" onclick="viewPageResultsByIndex(${index})">
+                   View Results
+               </button>`
+            : `<button class="btn btn-sm btn-secondary" disabled>Scanning...</button>`;
+        
+        return `
+            <tr>
+                <td>
+                    <div>
+                        <strong>${escapeHtml(page.name)}</strong>
+                        <a href="${escapeHtml(page.url)}" class="ms-1" target="_blank">
+                            <i class="bi bi-box-arrow-up-right small"></i>
+                        </a>
+                    </div>
+                    <small class="text-muted">${escapeHtml(page.url)}</small>
+                </td>
+                <td>${statusBadge}</td>
+                <td>${scoreBadge}</td>
+                <td>${issuesBadges}</td>
+                <td><small class="text-muted">${lastScan}</small></td>
+                <td>${actionButton}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    $('#page-targets-list').html(html);
+}
+
+// Wrapper function to get page data by index
+function viewPageResultsByIndex(index) {
+    const page = currentPagesData[index];
+    if (page) {
+        // Navigate to the page detail sub-page using page ID
+        window.location.href = `/sites/${siteId}/page/${page.id}`;
+    }
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Helper function for time ago
+function getTimeAgo(date) {
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+    
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return Math.floor(seconds / 60) + ' min ago';
+    if (seconds < 86400) return Math.floor(seconds / 3600) + ' hours ago';
+    if (seconds < 604800) return Math.floor(seconds / 86400) + ' days ago';
+    return date.toLocaleDateString();
+}
+
+// Search targets functionality
+$('#search-targets').on('input', function() {
+    const searchTerm = $(this).val().toLowerCase();
+    $('#page-targets-list tr').each(function() {
+        const text = $(this).text().toLowerCase();
+        $(this).toggle(text.indexOf(searchTerm) > -1);
+    });
+});
+
+// ==================== ACCESSIBILITY TAB ====================
+
+// Load site-wide accessibility data
+function loadAccessibilityData() {
+    $.ajax({
+        url: '/api/sites/' + siteId + '/accessibility',
+        method: 'GET',
+        success: function(data) {
+            displayAccessibilityOverview(data);
+            displayAccessibilityIssues(data.issues || [], data);
+            displayPassedTests(data.passed_tests || [], data.passed_count || 0);
+            displayScannedPages(data.pages || []);
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading accessibility data:', error);
+        }
+    });
+}
+
+// Display accessibility score overview
+function displayAccessibilityOverview(data) {
+    const score = data.score || 0;
+    const critical = data.critical || 0;
+    const serious = data.serious || 0;
+    const totalIssues = data.total_issues || 0;
+    
+    // Update circular score
+    $('#score-text').text(score);
+    
+    // Update progress bars
+    const maxIssues = Math.max(critical, serious, 100);
+    const criticalPercent = maxIssues > 0 ? (critical / maxIssues * 100) : 0;
+    const seriousPercent = maxIssues > 0 ? (serious / maxIssues * 100) : 0;
+    const passedPercent = score; // Use score as passed percentage
+    
+    $('#critical-count').text(critical);
+    $('#serious-count').text(serious);
+    $('#passed-count').text(data.passed_count || 0);
+    
+    $('#critical-bar').css('width', Math.min(criticalPercent, 100) + '%');
+    $('#serious-bar').css('width', Math.min(seriousPercent, 100) + '%');
+    $('#passed-bar').css('width', passedPercent + '%');
+    
+    // Update circular progress
+    const circumference = 314;
+    const offset = circumference - (score / 100 * circumference);
+    $('#score-circle').css('stroke-dashoffset', offset);
+    
+    // Set color based on score
+    let color = '#dc3545'; // red
+    if (score >= 85) color = '#28a745'; // green
+    else if (score >= 70) color = '#ffc107'; // yellow
+    $('#score-circle').attr('stroke', color);
+}
+
+// Display site-wide accessibility issues
+function displayAccessibilityIssues(issues, data) {
+    $('#issues-subtitle').text(`${issues.length} unique issue${issues.length !== 1 ? 's' : ''} found across the site`);
+    
+    if (!issues || issues.length === 0) {
+        $('#accessibility-issues-list').html('<p class="text-center text-muted py-4">No accessibility issues found! 🎉</p>');
+        return;
+    }
+    
+    const issuesHtml = issues.map(issue => {
+        const impactClass = issue.impact === 'critical' ? 'danger' : 
+                           issue.impact === 'serious' ? 'warning' : 
+                           issue.impact === 'moderate' ? 'info' : 'secondary';
+        
+        const impactText = issue.impact.charAt(0).toUpperCase() + issue.impact.slice(1);
+        
+        return `
+            <div class="card mb-3 border-${impactClass}">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <span class="badge bg-${impactClass} me-2">${impactText}</span>
+                            <strong>${escapeHtml(issue.description)}</strong>
+                        </div>
+                        <code>${escapeHtml(issue.id)}</code>
+                    </div>
+                    ${issue.help ? `<p class="small mb-2">${escapeHtml(issue.help)}</p>` : ''}
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            <i class="bi bi-file-earmark"></i> Affects ${issue.pages_affected} page${issue.pages_affected !== 1 ? 's' : ''}
+                        </small>
+                        <small class="text-muted">
+                            <i class="bi bi-exclamation-circle"></i> ${issue.total_instances} total instance${issue.total_instances !== 1 ? 's' : ''}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    $('#accessibility-issues-list').html(issuesHtml);
+}
+
+// Display passed tests
+function displayPassedTests(passedTests, passedCount) {
+    $('#passed-subtitle').text(`${passedCount} test${passedCount !== 1 ? 's' : ''} passed successfully`);
+    
+    if (!passedTests || passedTests.length === 0) {
+        $('#passed-tests-list').html(`
+            <div class="text-center py-5">
+                <i class="bi bi-check-circle text-success" style="font-size: 5rem;"></i>
+                <h5 class="mt-3">Excellent! ${passedCount} accessibility tests passed.</h5>
+                <p class="text-muted">Your site demonstrates good accessibility practices.</p>
+            </div>
+        `);
+        return;
+    }
+    
+    const testsHtml = passedTests.map(test => {
+        return `
+            <div class="card mb-2">
+                <div class="card-body py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            <strong>${escapeHtml(test.name)}</strong>
+                        </div>
+                        <div>
+                            <span class="badge bg-light text-dark">${escapeHtml(test.wcag)}</span>
+                            <code class="ms-2">${escapeHtml(test.id)}</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    const summary = `
+        <div class="alert alert-success mb-3">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            <strong>Great job!</strong> ${passedCount} accessibility tests passed across all pages.
+        </div>
+    `;
+    
+    $('#passed-tests-list').html(summary + testsHtml);
+}
+
+// Display scanned pages
+function displayScannedPages(pages) {
+    $('#pages-subtitle').text(`${pages.length} page${pages.length !== 1 ? 's' : ''} analyzed`);
+    
+    if (!pages || pages.length === 0) {
+        $('#scanned-pages-list').html('<p class="text-center text-muted py-4">No pages scanned yet</p>');
+        return;
+    }
+    
+    const pagesHtml = pages.map(page => {
+        const scoreClass = page.score >= 90 ? 'success' : page.score >= 70 ? 'warning' : 'danger';
+        const statusText = page.score >= 90 ? 'Excellent' : page.score >= 70 ? 'Good' : 'Needs Improvement';
+        
+        return `
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h6 class="mb-1">${escapeHtml(page.name)}</h6>
+                            <small class="text-muted">
+                                <a href="${escapeHtml(page.url)}" target="_blank">
+                                    ${escapeHtml(page.url)} <i class="bi bi-box-arrow-up-right"></i>
+                                </a>
+                            </small>
+                        </div>
+                        <span class="badge bg-${scoreClass}" style="font-size: 1.1rem; padding: 0.5rem 0.75rem;">
+                            ${page.score}
+                        </span>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-6 col-md-3">
+                            <small class="text-muted">Status</small>
+                            <p class="mb-0"><strong class="text-${scoreClass}">${statusText}</strong></p>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <small class="text-muted">Total Issues</small>
+                            <p class="mb-0"><strong>${page.issues}</strong></p>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <small class="text-muted">Critical</small>
+                            <p class="mb-0"><strong class="text-danger">${page.critical}</strong></p>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <small class="text-muted">Serious</small>
+                            <p class="mb-0"><strong class="text-warning">${page.serious}</strong></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    $('#scanned-pages-list').html(pagesHtml);
+}
+
+// Severity filter for accessibility issues
+$('#severity-filter').on('change', function() {
+    const filter = $(this).val();
+    $('#accessibility-issues-list .card').each(function() {
+        const card = $(this);
+        if (filter === 'all') {
+            card.show();
+        } else {
+            const badgeText = card.find('.badge').first().text().toLowerCase();
+            card.toggle(badgeText === filter);
+        }
+    });
+});
+
+// Load site-level score trends
+function loadSiteTrends() {
+    $('#site-trends-loading').show();
+    $('#site-trends-empty').hide();
+    $('#site-trends-charts').hide();
+
+    $.ajax({
+        url: '/api/sites/' + siteId + '/results',
+        method: 'GET',
+        success: function(data) {
+            $('#site-trends-loading').hide();
+
+            // Check if we have enough historical data (need at least 2 scans)
+            if (!data.recent_scans || data.recent_scans.length < 2) {
+                $('#site-trends-empty').show();
+                return;
+            }
+
+            $('#site-trends-charts').show();
+
+            // Extract data from recent scans (reverse to show chronological order)
+            const scans = data.recent_scans.slice().reverse();
+            const labels = scans.map(scan => {
+                const d = new Date(scan.scan_date);
+                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            });
+            const scores = scans.map(scan => scan.score || 0);
+
+            createSiteTrendChart('site-accessibility-trend-chart', 'Accessibility', labels, scores, '#0d6efd');
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading site trends:', error);
+            $('#site-trends-loading').hide();
+            $('#site-trends-empty').show();
+        }
+    });
+}
+
+// Create trend chart for site
+let siteTrendChartInstances = {};
+function createSiteTrendChart(canvasId, label, labels, data, color) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+
+    if (siteTrendChartInstances[canvasId]) {
+        siteTrendChartInstances[canvasId].destroy();
+    }
+
+    siteTrendChartInstances[canvasId] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: label + ' Score',
+                data: data,
+                borderColor: color,
+                backgroundColor: color + '33',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return label + ': ' + context.parsed.y.toFixed(1);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        font: { size: 10 }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: { size: 10 }
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+</script>
+{% endblock %}

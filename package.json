@@ -1,0 +1,12 @@
+{
+  "name": "cwac-admin",
+  "version": "1.0.0",
+  "description": "CWAC-ADMIN Accessibility Scanner",
+  "config": {
+    "chromeVersion": "122.0.6261.39"
+  },
+  "dependencies": {
+    "axe-core": "^4.10.2",
+    "@mozilla/readability": "^0.6.0"
+  }
+}

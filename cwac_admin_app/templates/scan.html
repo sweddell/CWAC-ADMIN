@@ -1,0 +1,2162 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}Scan Sites - Centralised Web Accessibility Checker{% endblock %}
+{% block page_title %}<i class="bi bi-play-circle"></i> Run Accessibility Scan{% endblock %}
+{% block page_description %}<p class="text-muted mb-0" style="font-size: 0.9rem;">Configure and start accessibility scans</p>{% endblock %}
+
+{% block extra_css %}
+<style>
+.result-details {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Scan Configuration Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-gear"></i> Scan Configurations</h5>
+                <div>
+                    <button class="btn btn-success btn-sm" onclick="createConfig()">
+                        <i class="bi bi-plus-circle"></i> Add Configuration
+                    </button>
+                    <button class="btn btn-primary btn-sm ms-2" onclick="showStartScanModal()">
+                        <i class="bi bi-play-fill"></i> Start Scan
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="configs-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Max Pages</th>
+                                <th>Threads</th>
+                                <th>Headless</th>
+                                <th>Plugins</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="configs-tbody">
+                            <tr>
+                                <td colspan="6" class="text-center">Loading configurations...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card text-white bg-primary">
+            <div class="card-body text-center">
+                <h6>Sites Ready</h6>
+                <h2 id="sites-count">0</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card text-white bg-info">
+            <div class="card-body text-center">
+                <h6>Configurations</h6>
+                <h2 id="config-count">0</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scheduled Scans -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Scheduled Scans</h5>
+                <button class="btn btn-primary btn-sm" onclick="showAddScheduleModal()">
+                    <i class="bi bi-plus-circle"></i> Add Schedule
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Configuration</th>
+                                <th>Schedule</th>
+                                <th>Last Run</th>
+                                <th>Next Run</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="schedules-tbody">
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">Loading schedules...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Scans -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5><i class="bi bi-activity"></i> Active Scans</h5>
+            </div>
+            <div class="card-body" id="active-scans">
+                <div class="text-center text-muted">No active scans</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Completed Scan Results -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5><i class="bi bi-folder2-open"></i> Completed Scan Results</h5>
+            </div>
+            <div class="card-body">
+                <div id="scan-results-list">
+                    <div class="text-center">Loading results...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Result View Modal -->
+<div class="modal fade" id="resultModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resultModalTitle">Scan Results</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="resultModalBody">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="download-results-btn">
+                    <i class="bi bi-download"></i> Download All Results (ZIP)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Schedule Modal -->
+<div class="modal fade" id="scheduleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="scheduleModalTitle">Add Scheduled Scan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="scheduleForm">
+                    <input type="hidden" id="schedule-id">
+                    
+                    <div class="mb-3">
+                        <label for="schedule-config" class="form-label">Scan Configuration *</label>
+                        <select class="form-select" id="schedule-config" required>
+                            <option value="">Select a configuration...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="schedule-type" class="form-label">Schedule Type *</label>
+                        <select class="form-select" id="schedule-type" required onchange="updateScheduleValueInput()">
+                            <option value="">Select schedule type...</option>
+                            <option value="hourly">Hourly</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="cron">Custom (Cron)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3" id="schedule-value-container">
+                        <label for="schedule-value" class="form-label">Schedule Value *</label>
+                        <input type="text" class="form-control" id="schedule-value" required>
+                        <div class="form-text" id="schedule-value-help">Select a schedule type first</div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="schedule-enabled" checked>
+                        <label class="form-check-label" for="schedule-enabled">
+                            Enabled (start immediately)
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveSchedule()">Save Schedule</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Configuration Editor Modal -->
+<div class="modal fade" id="configModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="configModalTitle">Configuration Editor</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs" id="configTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic-panel" type="button" role="tab">
+                            <i class="bi bi-gear"></i> Basic
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="plugins-tab" data-bs-toggle="tab" data-bs-target="#plugins-panel" type="button" role="tab">
+                            <i class="bi bi-plugin"></i> Audit Plugins
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="viewport-tab" data-bs-toggle="tab" data-bs-target="#viewport-panel" type="button" role="tab">
+                            <i class="bi bi-phone"></i> Viewports
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="advanced-tab" data-bs-toggle="tab" data-bs-target="#advanced-panel" type="button" role="tab">
+                            <i class="bi bi-code-square"></i> Advanced
+                        </button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content mt-3" id="configTabContent">
+                    <!-- Basic Settings Tab -->
+                    <div class="tab-pane fade show active" id="basic-panel" role="tabpanel">
+                        <form id="configForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="config-filename" class="form-label">Configuration File Name *</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">config_</span>
+                                            <input type="text" class="form-control" id="config-filename" required pattern="[a-z0-9_]+" placeholder="my_scan">
+                                            <span class="input-group-text">.json</span>
+                                        </div>
+                                        <div class="form-text">Lowercase, numbers, underscores only</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="config-audit-name" class="form-label">Display Name *</label>
+                                        <input type="text" class="form-control" id="config-audit-name" required placeholder="My Custom Scan">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <h6 class="border-bottom pb-2 mb-3">Scanning Parameters</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="config-max-links" class="form-label">Max Pages per Site</label>
+                                        <input type="number" class="form-control" id="config-max-links" min="1" max="1000" value="20">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="config-thread-count" class="form-label">Thread Count</label>
+                                        <input type="number" class="form-control" id="config-thread-count" min="1" max="16" value="4">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="config-browser" class="form-label">Browser</label>
+                                        <select class="form-select" id="config-browser">
+                                            <option value="chrome">Chrome</option>
+                                            <option value="firefox">Firefox</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <h6 class="border-bottom pb-2 mb-3">Timeouts & Delays</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="config-page-timeout" class="form-label">Page Timeout (s)</label>
+                                        <input type="number" class="form-control" id="config-page-timeout" min="5" max="60" value="10" step="0.1">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="config-script-timeout" class="form-label">Script Timeout (s)</label>
+                                        <input type="number" class="form-control" id="config-script-timeout" min="5" max="60" value="15" step="0.1">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="config-delay-pages" class="form-label">Delay Between Pages (s)</label>
+                                        <input type="number" class="form-control" id="config-delay-pages" min="0" max="5" value="0.2" step="0.1">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="config-delay-after-load" class="form-label">Delay After Load (s)</label>
+                                        <input type="number" class="form-control" id="config-delay-after-load" min="0" max="5" value="0.1" step="0.1">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <h6 class="border-bottom pb-2 mb-3">Options</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="config-headless" checked>
+                                        <label class="form-check-label" for="config-headless">
+                                            <strong>Headless Mode</strong> - Run without browser window
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="config-follow-robots" checked>
+                                        <label class="form-check-label" for="config-follow-robots">
+                                            <strong>Follow robots.txt</strong> - Respect robot exclusion rules
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="config-https-only" checked>
+                                        <label class="form-check-label" for="config-https-only">
+                                            <strong>HTTPS Only</strong> - Only scan HTTPS sites
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="config-shuffle-urls" checked>
+                                        <label class="form-check-label" for="config-shuffle-urls">
+                                            <strong>Shuffle URLs</strong> - Randomize scan order
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="config-perform-header" checked>
+                                        <label class="form-check-label" for="config-perform-header">
+                                            <strong>Check Headers</strong> - Verify HTTP headers
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="config-record-response-codes" checked>
+                                        <label class="form-check-label" for="config-record-response-codes">
+                                            <strong>Record Response Codes</strong> - Track unexpected codes
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="config-force-details" checked>
+                                        <label class="form-check-label" for="config-force-details">
+                                            <strong>Force Open Details</strong> - Expand all &lt;details&gt; elements
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- Audit Plugins Tab -->
+                    <div class="tab-pane fade" id="plugins-panel" role="tabpanel">
+                        <p class="text-muted">Enable and configure audit plugins for accessibility testing</p>
+                        
+                        <!-- Axe Core -->
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>axe-core Audit</strong>
+                                    <span class="badge bg-primary ms-2">Core</span>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="plugin-axe-enabled" checked>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2">Industry-leading accessibility rules engine from Deque</p>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="plugin-axe-best-practice">
+                                    <label class="form-check-label" for="plugin-axe-best-practice">
+                                        Include best practices (non-WCAG rules)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Language Audit -->
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <strong>Language & Readability Audit</strong>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="plugin-language-enabled" checked>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2">Analyze page language and content readability</p>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="plugin-language-sentiment">
+                                    <label class="form-check-label" for="plugin-language-sentiment">
+                                        Run sentiment analysis
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Reflow Audit -->
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <strong>Reflow Audit</strong>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="plugin-reflow-enabled" checked>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2">Test content reflow at different viewport sizes</p>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label for="plugin-reflow-viewport" class="form-label">Viewport to Test</label>
+                                        <select class="form-select form-select-sm" id="plugin-reflow-viewport">
+                                            <option value="small">Small (320px)</option>
+                                            <option value="medium">Medium (1280px)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check mt-4">
+                                            <input class="form-check-input" type="checkbox" id="plugin-reflow-screenshot">
+                                            <label class="form-check-label" for="plugin-reflow-screenshot">
+                                                Screenshot failures
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Focus Indicator Audit -->
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <strong>Focus Indicator Audit</strong>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="plugin-focus-enabled">
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2">Test keyboard focus visibility on interactive elements</p>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <label for="plugin-focus-selector" class="form-label">Root Element</label>
+                                        <input type="text" class="form-control form-control-sm" id="plugin-focus-selector" value="main">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="plugin-focus-pre-tabs" class="form-label">Pre-Tab Presses</label>
+                                        <input type="number" class="form-control form-control-sm" id="plugin-focus-pre-tabs" value="0" min="0" max="10">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="plugin-focus-max-tabs" class="form-label">Max Tab Presses</label>
+                                        <input type="number" class="form-control form-control-sm" id="plugin-focus-max-tabs" value="5" min="1" max="50">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Screenshot Audit -->
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <strong>Screenshot Audit</strong>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="plugin-screenshot-enabled">
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2">Capture screenshots of every page scanned</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Element Audit -->
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <strong>Element Audit</strong>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="plugin-element-enabled">
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2">Test specific elements with custom CSS selector</p>
+                                <label for="plugin-element-selector" class="form-label">Target Element Selector</label>
+                                <input type="text" class="form-control form-control-sm" id="plugin-element-selector" value="input:not([type='search'])">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Viewports Tab -->
+                    <div class="tab-pane fade" id="viewport-panel" role="tabpanel">
+                        <p class="text-muted">Configure viewport sizes for responsive testing</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Small Viewport (Mobile)</h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <label for="viewport-small-width" class="form-label">Width (px)</label>
+                                        <input type="number" class="form-control" id="viewport-small-width" value="320" min="240" max="768">
+                                    </div>
+                                    <div class="col-6">
+                                        <label for="viewport-small-height" class="form-label">Height (px)</label>
+                                        <input type="number" class="form-control" id="viewport-small-height" value="450" min="320" max="1024">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Medium Viewport (Desktop)</h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <label for="viewport-medium-width" class="form-label">Width (px)</label>
+                                        <input type="number" class="form-control" id="viewport-medium-width" value="1280" min="768" max="3840">
+                                    </div>
+                                    <div class="col-6">
+                                        <label for="viewport-medium-height" class="form-label">Height (px)</label>
+                                        <input type="number" class="form-control" id="viewport-medium-height" value="800" min="480" max="2160">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <label for="config-delay-viewports" class="form-label">Delay Between Viewports (seconds)</label>
+                            <input type="number" class="form-control" id="config-delay-viewports" value="0.1" min="0" max="5" step="0.1">
+                            <div class="form-text">Time to wait when switching between viewport sizes</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Advanced Tab -->
+                    <div class="tab-pane fade" id="advanced-panel" role="tabpanel">
+                        <div class="alert alert-info">
+                            <strong><i class="bi bi-info-circle"></i> How This Works:</strong><br>
+                            • <strong>Recommended:</strong> Use the Basic, Plugins, and Viewports tabs to configure your scan<br>
+                            • <strong>Advanced Users:</strong> You can edit the JSON below, but only if you make changes AND stay on this tab when clicking Save<br>
+                            • <strong>Default Behavior:</strong> Your changes in other tabs will be saved automatically
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="config-user-agent" class="form-label">User Agent String</label>
+                            <input type="text" class="form-control font-monospace" id="config-user-agent" value="Mozilla/5.0 (compatible; Centralised Web Accessibility Checkerbot/1.0)">
+                            <div class="form-text">Browser identification string sent with requests</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="config-json" class="form-label">
+                                Full JSON Configuration 
+                                <span class="badge bg-warning text-dark">Advanced</span>
+                            </label>
+                            <textarea class="form-control font-monospace" id="config-json" rows="15"></textarea>
+                            <div class="form-text">
+                                <strong>⚠️ Warning:</strong> Only edit this if you know JSON syntax. Changes made here will ONLY be used if:<br>
+                                1. You manually edit this JSON field<br>
+                                2. You're on the Advanced tab when clicking Save<br>
+                                Otherwise, your changes in the other tabs will be used.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveConfig()">
+                    <i class="bi bi-save"></i> Save Configuration
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Start Scan Modal -->
+<div class="modal fade" id="startScanModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Start Scan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="start-scan-config" class="form-label">Select Configuration</label>
+                    <select class="form-select" id="start-scan-config">
+                        <option value="">Choose configuration...</option>
+                    </select>
+                </div>
+                <div class="alert alert-info">
+                    <strong>Sites to scan:</strong> <span id="start-sites-count">0</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="startScan()">
+                    <i class="bi bi-play-fill"></i> Start Scan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Config Details Modal -->
+<div class="modal fade" id="configDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="configDetailsTitle">Configuration Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="text-muted">Total Scans</h6>
+                                <h3 id="config-total-scans">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center text-white bg-success">
+                            <div class="card-body">
+                                <h6>Successful</h6>
+                                <h3 id="config-successful">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center text-white bg-danger">
+                            <div class="card-body">
+                                <h6>Failed</h6>
+                                <h3 id="config-failed">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center text-white bg-info">
+                            <div class="card-body">
+                                <h6>Success Rate</h6>
+                                <h3 id="config-success-rate">0%</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="scan-history-tab" data-bs-toggle="tab" 
+                                data-bs-target="#scan-history" type="button" role="tab">
+                            <i class="bi bi-clock-history"></i> Scan History
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="config-details-tab" data-bs-toggle="tab" 
+                                data-bs-target="#config-details" type="button" role="tab">
+                            <i class="bi bi-gear"></i> Configuration
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="scan-history" role="tabpanel">
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-sm table-hover">
+                                <thead class="sticky-top bg-white">
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Started</th>
+                                        <th>Ended</th>
+                                        <th>Duration</th>
+                                        <th>Message</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="config-scan-history">
+                                    <tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="config-details" role="tabpanel">
+                        <pre id="config-json-display" class="bg-light p-3" style="max-height: 400px; overflow-y: auto;"></pre>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let activeScans = {};
+let scanCheckInterval = null;
+let completedResults = [];
+let currentResultId = null;
+let currentResultPage = 1;
+const resultsPerPage = 10;
+
+$(document).ready(function() {
+    loadConfigurations();
+    loadScanInfo();
+    loadCompletedResults();
+    loadSchedules();
+    checkActiveScans();
+    
+    // Start polling only if there are active scans (checkActiveScans will handle this)
+    // Poll every 5 seconds instead of 2 to reduce noise
+    scanCheckInterval = setInterval(checkActiveScans, 5000);
+    
+    // Track manual JSON editing
+    $('#config-json').on('input', function() {
+        $(this).data('manually-edited', true);
+    });
+    
+    // Reset JSON manual edit flag when switching tabs
+    $('#configTabs button[data-bs-toggle="tab"]').on('shown.bs.tab', function(e) {
+        if (e.target.id !== 'advanced-tab') {
+            $('#config-json').data('manually-edited', false);
+        }
+    });
+});
+
+function loadConfigurations() {
+    $.get('/api/scan/configs', function(configs) {
+        // Update table
+        const tbody = $('#configs-tbody');
+        const startSelect = $('#start-scan-config');
+        
+        if (configs.length === 0) {
+            tbody.html('<tr><td colspan="6" class="text-center text-muted">No configurations found</td></tr>');
+            startSelect.html('<option value="">No configurations available</option>');
+            $('#config-count').text(0);
+            return;
+        }
+        
+        // Sort configs
+        configs.sort((a, b) => {
+            if (a.filename === 'config_wcag22_aa.json') return -1;
+            if (b.filename === 'config_wcag22_aa.json') return 1;
+            return a.name.localeCompare(b.name);
+        });
+        
+        // Populate table
+        let tableHtml = '';
+        configs.forEach(config => {
+            const isProtected = ['config_default.json', 'config_wcag22_aa.json', 'config_test.json'].includes(config.filename);
+            const badge = config.filename === 'config_wcag22_aa.json' ? '<span class="badge bg-success ms-2">WCAG 2.2 AA</span>' : '';
+            
+            tableHtml += `
+                <tr>
+                    <td>
+                        <strong>${config.name}</strong> ${badge}
+                        <br><small class="text-muted">${config.filename}</small>
+                    </td>
+                    <td>${config.max_links}</td>
+                    <td>${config.thread_count}</td>
+                    <td>${config.headless !== false ? '<span class="badge bg-secondary">Yes</span>' : '<span class="badge bg-light text-dark">No</span>'}</td>
+                    <td><small class="text-muted">Various</small></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewConfig('${config.filename}')" title="View Details">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="editConfig('${config.filename}')" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteConfig('${config.filename}')" 
+                                ${isProtected ? 'disabled' : ''} title="${isProtected ? 'Protected' : 'Delete'}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.html(tableHtml);
+        
+        // Populate start scan dropdown
+        startSelect.empty();
+        startSelect.append('<option value="">Choose configuration...</option>');
+        configs.forEach(config => {
+            let displayName = config.name;
+            if (config.filename === 'config_wcag22_aa.json') {
+                displayName = '⭐ ' + displayName;
+            }
+            startSelect.append(`<option value="${config.filename}">${displayName}</option>`);
+        });
+        
+        $('#config-count').text(configs.length);
+    });
+}
+
+function loadScanInfo() {
+    // Load sites count
+    $.get('/api/sites', function(sites) {
+        $('#sites-count').text(sites.length);
+        $('#start-sites-count').text(sites.length);
+    });
+}
+
+function showStartScanModal() {
+    const modal = new bootstrap.Modal(document.getElementById('startScanModal'));
+    modal.show();
+}
+
+function viewConfig(filename) {
+    // Load config usage data
+    $.get(`/api/scan/configs/${filename}/usage`, function(data) {
+        // Update modal title
+        $('#configDetailsTitle').text(`${data.config.audit_name} - Usage Statistics`);
+        
+        // Update stats cards
+        $('#config-total-scans').text(data.stats.total_scans);
+        $('#config-successful').text(data.stats.successful);
+        $('#config-failed').text(data.stats.failed);
+        $('#config-success-rate').text(data.stats.success_rate + '%');
+        
+        // Update scan history table
+        const tbody = $('#config-scan-history');
+        tbody.empty();
+        
+        if (data.recent_scans.length === 0) {
+            tbody.html('<tr><td colspan="6" class="text-center text-muted">No scan history available</td></tr>');
+        } else {
+            data.recent_scans.forEach(scan => {
+                const statusBadge = getStatusBadge(scan.status);
+                const startTime = new Date(scan.start_time).toLocaleString();
+                const endTime = scan.end_time ? new Date(scan.end_time).toLocaleString() : '-';
+                const duration = calculateDuration(scan.start_time, scan.end_time);
+                
+                // Use a unique ID for each row to safely pass error details
+                const rowId = `scan-row-${scan.start_time}`;
+                const detailsBtn = scan.error_details ? 
+                    `<button class="btn btn-sm btn-outline-danger" data-error-details='${JSON.stringify(scan.error_details).replace(/'/g, "&#39;")}' onclick='showErrorDetailsFromButton(this)'>
+                        <i class="bi bi-exclamation-triangle"></i> View Error
+                    </button>` : '-';
+                
+                tbody.append(`
+                    <tr id="${rowId}">
+                        <td>${statusBadge}</td>
+                        <td><small>${startTime}</small></td>
+                        <td><small>${endTime}</small></td>
+                        <td><small>${duration}</small></td>
+                        <td><small>${scan.message}</small></td>
+                        <td>${detailsBtn}</td>
+                    </tr>
+                `);
+            });
+        }
+        
+        // Update config JSON display
+        $('#config-json-display').text(JSON.stringify(data.config, null, 2));
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('configDetailsModal'));
+        modal.show();
+    }).fail(function(xhr) {
+        alert('Failed to load configuration details: ' + (xhr.responseJSON?.error || 'Unknown error'));
+    });
+}
+
+function getStatusBadge(status) {
+    const badges = {
+        'completed': '<span class="badge bg-success">Completed</span>',
+        'error': '<span class="badge bg-danger">Failed</span>',
+        'running': '<span class="badge bg-primary">Running</span>',
+        'starting': '<span class="badge bg-info">Starting</span>',
+        'cancelled': '<span class="badge bg-warning">Cancelled</span>'
+    };
+    return badges[status] || '<span class="badge bg-secondary">Unknown</span>';
+}
+
+function calculateDuration(startTime, endTime) {
+    if (!endTime) return '-';
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    const diff = Math.abs(end - start);
+    
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+    
+    if (minutes > 0) {
+        return `${minutes}m ${seconds}s`;
+    }
+    return `${seconds}s`;
+}
+
+function showErrorDetails(errorDetails) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Error Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <pre class="bg-light p-3" style="max-height: 400px; overflow-y: auto; font-size: 0.875rem;">${errorDetails}</pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    modal.addEventListener('hidden.bs.modal', function() {
+        document.body.removeChild(modal);
+    });
+}
+
+function showErrorDetailsFromButton(button) {
+    // Safely extract error details from data attribute
+    const errorDetailsJson = button.getAttribute('data-error-details');
+    if (errorDetailsJson) {
+        try {
+            const errorDetails = JSON.parse(errorDetailsJson);
+            showErrorDetails(errorDetails);
+        } catch (e) {
+            console.error('Failed to parse error details:', e);
+            showErrorDetails('Error details could not be displayed.');
+        }
+    }
+}
+
+function startScan() {
+    const config = $('#start-scan-config').val();
+    if (!config) {
+        alert('Please select a configuration');
+        return;
+    }
+    
+    $.ajax({
+        url: '/api/scan/start',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ config: config }),
+        success: function(response) {
+            if (response.success) {
+                const scanId = response.scan_id;
+                activeScans[scanId] = {
+                    config: config,
+                    startTime: new Date()
+                };
+                
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('startScanModal'));
+                if (modal) modal.hide();
+                
+                // Restart polling if it was stopped
+                if (!scanCheckInterval) {
+                    console.log('Scan started - resuming polling');
+                    scanCheckInterval = setInterval(checkActiveScans, 5000);
+                }
+                
+                updateActiveScanDisplay();
+                alert('Scan started successfully!');
+            }
+        },
+        error: function(xhr, status, error) {
+            alert('Failed to start scan: ' + (xhr.responseJSON?.error || error));
+        }
+    });
+}
+
+function checkActiveScans() {
+    // Get all active scans from the server
+    $.get('/api/scan/active', function(data) {
+        // Clear existing activeScans
+        activeScans = {};
+        
+        // Add all active scans from server
+        data.forEach(scan => {
+            activeScans[scan.id] = {
+                config: scan.config,
+                startTime: new Date(scan.start_time),
+                progress: {
+                    status: scan.status,
+                    progress: scan.progress,
+                    message: scan.message
+                }
+            };
+        });
+        
+        // Stop polling if no active scans
+        if (Object.keys(activeScans).length === 0 && scanCheckInterval) {
+            clearInterval(scanCheckInterval);
+            scanCheckInterval = null;
+            console.log('No active scans - stopped polling');
+        }
+        
+        updateActiveScanDisplay();
+    });
+    
+    // Also update progress for each active scan
+    for (const scanId in activeScans) {
+        $.get(`/api/scan/progress/${scanId}`, function(progress) {
+            if (activeScans[scanId]) {
+                activeScans[scanId].progress = progress;
+                
+                if (progress.status === 'completed' || progress.status === 'error' || progress.status === 'cancelled') {
+                    // Remove from active and reload history
+                    delete activeScans[scanId];
+                    loadScanHistory();
+                }
+                
+                updateActiveScanDisplay();
+            }
+        }).fail(function() {
+            // Scan not found, remove from active
+            delete activeScans[scanId];
+            updateActiveScanDisplay();
+        });
+    }
+}
+
+function updateActiveScanDisplay() {
+    const container = $('#active-scans');
+    
+    const scanIds = Object.keys(activeScans);
+    if (scanIds.length === 0) {
+        container.html('<div class="text-center text-muted">No active scans</div>');
+        return;
+    }
+    
+    let html = '';
+    scanIds.forEach(scanId => {
+        const scan = activeScans[scanId];
+        const progress = scan.progress || { status: 'starting', progress: 0, message: 'Initializing...' };
+        
+        const progressClass = {
+            'starting': 'info',
+            'running': 'primary',
+            'completed': 'success',
+            'error': 'danger',
+            'cancelled': 'warning'
+        }[progress.status] || 'secondary';
+        
+        html += `
+            <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold">Scan ${scanId.substring(0, 8)}...</span>
+                    <span class="badge bg-${progressClass}">${progress.status}</span>
+                </div>
+                <div class="progress mb-2" style="height: 25px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-${progressClass}" 
+                         style="width: ${progress.progress}%">
+                        ${progress.progress}%
+                    </div>
+                </div>
+                <div class="small text-muted">${progress.message || 'Processing...'}</div>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-danger" onclick="stopScan('${scanId}')">
+                        <i class="bi bi-stop-fill"></i> Stop
+                    </button>
+                    <button class="btn btn-sm btn-info ms-2" onclick="viewScanDetails('${scanId}')">
+                        <i class="bi bi-info-circle"></i> Details
+                    </button>
+                </div>
+            </div>
+            <hr>
+        `;
+    });
+    
+    container.html(html);
+}
+
+function stopScan(scanId) {
+    if (confirm('Stop this scan?')) {
+        $.post(`/api/scan/stop/${scanId}`, function(response) {
+            if (response.success) {
+                delete activeScans[scanId];
+                updateActiveScanDisplay();
+            }
+        });
+    }
+}
+
+function viewScanDetails(scanId) {
+    const scan = activeScans[scanId];
+    if (scan && scan.progress) {
+        alert(`Scan ID: ${scanId}\nStatus: ${scan.progress.status}\nProgress: ${scan.progress.progress}%\nMessage: ${scan.progress.message}`);
+    }
+}
+
+let scanHistory = [];
+
+function loadScanHistory() {
+    $.get('/api/scan/history', function(data) {
+        scanHistory = data.slice(0, 10); // Keep only last 10
+        updateHistoryDisplay();
+    });
+}
+
+function addToHistory(scanId, scan) {
+    // No longer needed - history is loaded from server
+    loadScanHistory();
+}
+
+function updateHistoryDisplay() {
+    const tbody = $('#scan-history');
+    
+    if (scanHistory.length === 0) {
+        tbody.html('<tr><td colspan="5" class="text-center text-muted">No recent scans</td></tr>');
+        return;
+    }
+    
+    let html = '';
+    scanHistory.forEach(scan => {
+        const statusClass = {
+            'completed': 'success',
+            'error': 'danger',
+            'cancelled': 'warning',
+            'running': 'primary',
+            'starting': 'info'
+        }[scan.status] || 'secondary';
+        
+        const startTime = scan.start_time ? new Date(scan.start_time) : null;
+        const timeDisplay = startTime ? startTime.toLocaleTimeString() : '-';
+        
+        // Get error details button if available
+        let actionButton = '';
+        if (scan.status === 'completed') {
+            actionButton = `<a href="/results" class="btn btn-sm btn-primary">View Results</a>`;
+        } else if (scan.status === 'error') {
+            // Fetch error details from progress endpoint
+            actionButton = `<button class="btn btn-sm btn-outline-danger" onclick="showScanErrorDetails('${scan.id}')">
+                <i class="bi bi-exclamation-triangle"></i> View Error
+            </button>`;
+        } else if (scan.status === 'running' || scan.status === 'starting') {
+            actionButton = `<span class="badge bg-info">${scan.progress || 0}%</span>`;
+        } else {
+            actionButton = `<span class="text-muted">-</span>`;
+        }
+        
+        html += `
+            <tr>
+                <td><small>${scan.id.substring(0, 8)}...</small></td>
+                <td>${scan.config}</td>
+                <td>${timeDisplay}</td>
+                <td><span class="badge bg-${statusClass}">${scan.status}</span></td>
+                <td>${actionButton}</td>
+            </tr>
+        `;
+    });
+    
+    tbody.html(html);
+}
+
+// Completed Results Functions
+function loadCompletedResults() {
+    $.get('/api/results', function(data) {
+        completedResults = data;
+        displayCompletedResults();
+    }).fail(function() {
+        $('#scan-results-list').html('<div class="text-center text-muted">Failed to load results</div>');
+    });
+}
+
+function displayCompletedResults() {
+    const container = $('#scan-results-list');
+    
+    if (completedResults.length === 0) {
+        container.html('<div class="text-center text-muted">No scan results available</div>');
+        return;
+    }
+    
+    // Calculate pagination
+    const totalPages = Math.ceil(completedResults.length / resultsPerPage);
+    const startIdx = (currentResultPage - 1) * resultsPerPage;
+    const endIdx = startIdx + resultsPerPage;
+    const paginatedResults = completedResults.slice(startIdx, endIdx);
+    
+    // Create table
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Scan Name</th>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Sites</th>
+                        <th>Pages</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    paginatedResults.forEach(result => {
+        const date = new Date(result.timestamp);
+        const sites = result.summary.sites_scanned || 0;
+        const pages = result.summary.pages_scanned || 0;
+        const scanType = result.summary.scan_type || 'manual';
+        const status = result.status || 'completed';
+        
+        // Scan type badge
+        const typeIcon = scanType === 'scheduled' ? 'bi-clock-history' : 'bi-hand-index';
+        const typeClass = scanType === 'scheduled' ? 'info' : 'secondary';
+        const typeBadge = `<span class="badge bg-${typeClass}"><i class="bi ${typeIcon}"></i> ${scanType}</span>`;
+        
+        // Status badge
+        const statusClass = status === 'completed' ? 'success' : 'danger';
+        const statusIcon = status === 'completed' ? 'bi-check-circle' : 'bi-x-circle';
+        const statusBadge = `<span class="badge bg-${statusClass}"><i class="bi ${statusIcon}"></i> ${status}</span>`;
+        
+        // Actions - show delete for failed scans
+        let actionButtons = `
+            <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); viewCompletedResult('${result.id}')">
+                <i class="bi bi-eye"></i> View
+            </button>
+        `;
+        
+        if (status === 'failed') {
+            actionButtons += `
+                <button class="btn btn-sm btn-outline-danger ms-1" onclick="event.stopPropagation(); deleteFailedScan('${result.id}')">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+            `;
+        }
+        
+        const rowClass = status === 'completed' ? 'cursor: pointer;' : 'cursor: pointer; opacity: 0.7;';
+        
+        html += `
+            <tr style="${rowClass}" onclick="viewCompletedResult('${result.id}')">
+                <td>
+                    <strong>${result.name}</strong>
+                </td>
+                <td>
+                    <small class="text-muted">
+                        ${date.toLocaleDateString()} ${date.toLocaleTimeString()}
+                    </small>
+                </td>
+                <td>${typeBadge}</td>
+                <td>
+                    <span class="badge bg-primary">${sites}</span>
+                </td>
+                <td>
+                    <span class="badge bg-info">${pages}</span>
+                </td>
+                <td>${statusBadge}</td>
+                <td>
+                    ${actionButtons}
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    // Add pagination controls if needed
+    if (totalPages > 1) {
+        html += `
+            <nav aria-label="Results pagination">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item ${currentResultPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeResultPage(${currentResultPage - 1}); return false;">Previous</a>
+                    </li>
+        `;
+        
+        // Page numbers
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || (i >= currentResultPage - 2 && i <= currentResultPage + 2)) {
+                html += `
+                    <li class="page-item ${i === currentResultPage ? 'active' : ''}">
+                        <a class="page-link" href="#" onclick="changeResultPage(${i}); return false;">${i}</a>
+                    </li>
+                `;
+            } else if (i === currentResultPage - 3 || i === currentResultPage + 3) {
+                html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+            }
+        }
+        
+        html += `
+                    <li class="page-item ${currentResultPage === totalPages ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeResultPage(${currentResultPage + 1}); return false;">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        `;
+        
+        html += `
+            <div class="text-center text-muted small">
+                Showing ${startIdx + 1}-${Math.min(endIdx, completedResults.length)} of ${completedResults.length} results
+            </div>
+        `;
+    }
+    
+    container.html(html);
+}
+
+function changeResultPage(page) {
+    const totalPages = Math.ceil(completedResults.length / resultsPerPage);
+    if (page < 1 || page > totalPages) return;
+    currentResultPage = page;
+    displayCompletedResults();
+    // Scroll to results
+    $('html, body').animate({ scrollTop: $('#scan-results-list').offset().top - 100 }, 300);
+}
+
+function viewCompletedResult(resultId) {
+    currentResultId = resultId;
+    const result = completedResults.find(r => r.id === resultId);
+    
+    if (!result) {
+        alert('Result not found');
+        return;
+    }
+    
+    $('#resultModalTitle').text(result.name);
+    $('#resultModalBody').html(`
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    `);
+    
+    const modal = new bootstrap.Modal(document.getElementById('resultModal'));
+    modal.show();
+    
+    // Load detailed results
+    $.get(`/api/results/${resultId}`, function(details) {
+        displayDetailedResults(details);
+    });
+}
+
+function deleteFailedScan(resultId) {
+    const result = completedResults.find(r => r.id === resultId);
+    
+    if (!result) {
+        alert('Result not found');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete the failed scan "${result.name}"?\n\nThis will remove the results directory but keep database records for reporting.`)) {
+        return;
+    }
+    
+    $.ajax({
+        url: `/api/results/${resultId}`,
+        method: 'DELETE',
+        success: function(response) {
+            if (response.success) {
+                // Remove from local array
+                completedResults = completedResults.filter(r => r.id !== resultId);
+                
+                // Refresh display
+                displayCompletedResults();
+                
+                // Show success message
+                alert('Failed scan deleted successfully');
+            } else {
+                alert('Error: ' + (response.error || 'Unknown error'));
+            }
+        },
+        error: function(xhr) {
+            let errorMsg = 'Failed to delete scan';
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                errorMsg += ': ' + xhr.responseJSON.error;
+            }
+            alert(errorMsg);
+        }
+    });
+}
+
+function displayDetailedResults(details) {
+    let html = '<div class="result-details">';
+    
+    // Summary section
+    html += '<h6>Summary</h6>';
+    
+    if (details.axe_results && details.axe_results.results) {
+        const results = details.axe_results.results;
+        let totalViolations = 0;
+        let violationsByType = {};
+        let pageViolations = [];
+        
+        results.forEach(pageResult => {
+            const violations = pageResult.violations || [];
+            totalViolations += violations.length;
+            
+            violations.forEach(v => {
+                const impact = v.impact || 'moderate';
+                violationsByType[impact] = (violationsByType[impact] || 0) + 1;
+                pageViolations.push({
+                    url: pageResult.url,
+                    violation: v
+                });
+            });
+        });
+        
+        html += `
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">${results.length}</h5>
+                            <p class="card-text text-muted">Pages Scanned</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">${totalViolations}</h5>
+                            <p class="card-text text-muted">Total Issues</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-danger">${violationsByType.critical || 0}</h5>
+                            <p class="card-text text-muted">Critical</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-warning">${violationsByType.serious || 0}</h5>
+                            <p class="card-text text-muted">Serious</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Violations by page
+        html += '<h6>Issues by Page</h6>';
+        html += '<div class="table-responsive mb-4">';
+        html += '<table class="table table-sm">';
+        html += '<thead><tr><th>Page URL</th><th>Issue</th><th>Impact</th><th>Element</th></tr></thead>';
+        html += '<tbody>';
+        
+        pageViolations.slice(0, 50).forEach(pv => {
+            const impactClass = {
+                'critical': 'danger',
+                'serious': 'warning',
+                'moderate': 'info',
+                'minor': 'secondary'
+            }[pv.violation.impact] || 'secondary';
+            
+            html += `
+                <tr>
+                    <td class="text-truncate" style="max-width: 300px;" title="${pv.url}">
+                        <small>${pv.url}</small>
+                    </td>
+                    <td>${pv.violation.description}</td>
+                    <td><span class="badge bg-${impactClass}">${pv.violation.impact}</span></td>
+                    <td><code>${pv.violation.nodes?.[0]?.target?.[0] || '-'}</code></td>
+                </tr>
+            `;
+        });
+        
+        if (pageViolations.length > 50) {
+            html += `
+                <tr>
+                    <td colspan="4" class="text-center text-muted">
+                        ... and ${pageViolations.length - 50} more issues
+                    </td>
+                </tr>
+            `;
+        }
+        
+        html += '</tbody></table></div>';
+    } else {
+        html += '<div class="alert alert-info">No accessibility violations found!</div>';
+    }
+    
+    // Files section
+    if (details.files && details.files.length > 0) {
+        html += '<h6>Result Files</h6>';
+        html += '<div class="list-group mb-3">';
+        details.files.forEach(file => {
+            const sizeKB = (file.size / 1024).toFixed(1);
+            html += `
+                <a href="/api/results/${currentResultId}/download/${file.name}" 
+                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                   download>
+                    <span><i class="bi bi-file-earmark"></i> ${file.name}</span>
+                    <span class="badge bg-secondary">${sizeKB} KB</span>
+                </a>
+            `;
+        });
+        html += '</div>';
+    }
+    
+    html += '</div>';
+    
+    $('#resultModalBody').html(html);
+}
+
+$('#download-results-btn').click(function() {
+    if (currentResultId) {
+        window.location.href = `/api/results/${currentResultId}/download-all`;
+    }
+});
+
+function showScanErrorDetails(scanId) {
+    // Load full scan details from progress endpoint
+    $.get(`/api/scan/progress/${scanId}`, function(progress) {
+        if (progress.error_details) {
+            showErrorDetails(progress.error_details);
+        } else {
+            alert('No error details available for this scan.');
+        }
+    }).fail(function() {
+        alert('Could not load error details. Scan may have been cleared from memory.');
+    });
+}
+
+// Cleanup when leaving the page
+$(window).on('beforeunload', function() {
+    if (scanCheckInterval) {
+        clearInterval(scanCheckInterval);
+        scanCheckInterval = null;
+    }
+});
+
+// Configuration CRUD Functions
+let editingConfigFilename = null;
+
+function createConfig() {
+    editingConfigFilename = null;
+    $('#configModalTitle').text('Create New Configuration');
+    $('#config-filename').prop('readonly', false).val('');
+    
+    // Reset manual edit flag
+    $('#config-json').data('manually-edited', false);
+    
+    // Reset all form fields to defaults
+    $('#config-audit-name').val('');
+    $('#config-max-links').val(20);
+    $('#config-thread-count').val(4);
+    $('#config-browser').val('chrome');
+    $('#config-page-timeout').val(10);
+    $('#config-script-timeout').val(15);
+    $('#config-delay-pages').val(0.2);
+    $('#config-delay-after-load').val(0.1);
+    $('#config-delay-viewports').val(0.1);
+    
+    // Reset checkboxes
+    $('#config-headless').prop('checked', true);
+    $('#config-follow-robots').prop('checked', true);
+    $('#config-https-only').prop('checked', true);
+    $('#config-shuffle-urls').prop('checked', true);
+    $('#config-perform-header').prop('checked', true);
+    $('#config-record-response-codes').prop('checked', true);
+    $('#config-force-details').prop('checked', true);
+    
+    // Reset plugins
+    $('#plugin-axe-enabled').prop('checked', true);
+    $('#plugin-axe-best-practice').prop('checked', false);
+    $('#plugin-language-enabled').prop('checked', true);
+    $('#plugin-language-sentiment').prop('checked', false);
+    $('#plugin-reflow-enabled').prop('checked', true);
+    $('#plugin-reflow-viewport').val('small');
+    $('#plugin-reflow-screenshot').prop('checked', false);
+    $('#plugin-focus-enabled').prop('checked', false);
+    $('#plugin-focus-selector').val('main');
+    $('#plugin-focus-pre-tabs').val(0);
+    $('#plugin-focus-max-tabs').val(5);
+    $('#plugin-screenshot-enabled').prop('checked', false);
+    $('#plugin-element-enabled').prop('checked', false);
+    $('#plugin-element-selector').val("input:not([type='search'])");
+    $('#plugin-seo-enabled').prop('checked', true);
+    $('#plugin-seo-check-title').prop('checked', true);
+    $('#plugin-seo-check-meta-desc').prop('checked', true);
+    $('#plugin-seo-check-canonical').prop('checked', true);
+    $('#plugin-seo-check-h1').prop('checked', true);
+    $('#plugin-seo-check-alt').prop('checked', true);
+    $('#plugin-seo-check-json-ld').prop('checked', true);
+    $('#plugin-seo-check-og').prop('checked', true);
+    $('#plugin-seo-check-twitter').prop('checked', true);
+    $('#plugin-seo-check-robots').prop('checked', true);
+    $('#plugin-seo-check-sitemap').prop('checked', true);
+    $('#plugin-seo-check-language').prop('checked', true);
+    $('#plugin-seo-check-links').prop('checked', true);
+    $('#plugin-seo-alt-coverage').val(100);
+    $('#plugin-seo-title-min').val(50);
+    $('#plugin-seo-title-max').val(60);
+    $('#plugin-seo-desc-min').val(150);
+    
+    // Reset viewports
+    $('#viewport-small-width').val(320);
+    $('#viewport-small-height').val(450);
+    $('#viewport-medium-width').val(1280);
+    $('#viewport-medium-height').val(800);
+    
+    // Reset advanced
+    $('#config-user-agent').val('Mozilla/5.0 (compatible; Centralised Web Accessibility Checkerbot/1.0)');
+    $('#config-json').val('');
+    
+    // Show modal and switch to Basic tab
+    const modal = new bootstrap.Modal(document.getElementById('configModal'));
+    modal.show();
+    
+    // Switch to Basic tab
+    const basicTab = new bootstrap.Tab(document.getElementById('basic-tab'));
+    basicTab.show();
+}
+
+function editConfig(filename) {
+    editingConfigFilename = filename;
+    $('#configModalTitle').text('Edit Configuration');
+    $('#config-filename').prop('readonly', true).val(filename.replace('config_', '').replace('.json', ''));
+    
+    // Reset manual edit flag - we want form fields to be used, not the JSON
+    $('#config-json').data('manually-edited', false);
+    
+    // Load configuration details
+    $.get(`/api/scan/configs/${filename}`, function(config) {
+        // Basic tab
+        $('#config-audit-name').val(config.audit_name || '');
+        $('#config-max-links').val(config.max_links_per_domain || 20);
+        $('#config-thread-count').val(config.thread_count || 4);
+        $('#config-browser').val(config.browser || 'chrome');
+        $('#config-page-timeout').val(config.page_load_timeout || 10);
+        $('#config-script-timeout').val(config.script_timeout || 15);
+        $('#config-delay-pages').val(config.delay_between_page_loads || 0.2);
+        $('#config-delay-after-load').val(config.delay_after_page_load || 0.1);
+        $('#config-delay-viewports').val(config.delay_between_viewports || 0.1);
+        
+        // Options
+        $('#config-headless').prop('checked', config.headless !== false);
+        $('#config-follow-robots').prop('checked', config.follow_robots_txt !== false);
+        $('#config-https-only').prop('checked', config.only_allow_https !== false);
+        $('#config-shuffle-urls').prop('checked', config.shuffle_base_urls !== false);
+        $('#config-perform-header').prop('checked', config.perform_header_check !== false);
+        $('#config-record-response-codes').prop('checked', config.record_unexpected_response_codes !== false);
+        $('#config-force-details').prop('checked', config.force_open_details_elements !== false);
+        
+        // Plugins
+        const plugins = config.audit_plugins || {};
+        $('#plugin-axe-enabled').prop('checked', plugins.axe_core_audit?.enabled !== false);
+        $('#plugin-axe-best-practice').prop('checked', plugins.axe_core_audit?.['best-practice'] === true);
+        $('#plugin-language-enabled').prop('checked', plugins.language_audit?.enabled === true);
+        $('#plugin-language-sentiment').prop('checked', plugins.language_audit?.run_sentiment_analysis === true);
+        $('#plugin-reflow-enabled').prop('checked', plugins.reflow_audit?.enabled === true);
+        $('#plugin-reflow-viewport').val(plugins.reflow_audit?.viewport_to_test || 'small');
+        $('#plugin-reflow-screenshot').prop('checked', plugins.reflow_audit?.screenshot_failures === true);
+        $('#plugin-focus-enabled').prop('checked', plugins.focus_indicator_audit?.enabled === true);
+        $('#plugin-focus-selector').val(plugins.focus_indicator_audit?.root_element_css_selector || 'main');
+        $('#plugin-focus-pre-tabs').val(plugins.focus_indicator_audit?.pre_tab_key_presses || 0);
+        $('#plugin-focus-max-tabs').val(plugins.focus_indicator_audit?.max_tab_key_presses || 5);
+        $('#plugin-screenshot-enabled').prop('checked', plugins.screenshot_audit?.enabled === true);
+        $('#plugin-element-enabled').prop('checked', plugins.element_audit?.enabled === true);
+        $('#plugin-element-selector').val(plugins.element_audit?.target_element_css_selector || "input:not([type='search'])");
+        $('#plugin-seo-enabled').prop('checked', plugins.seo_aeo_audit?.enabled !== false);
+        $('#plugin-seo-check-title').prop('checked', plugins.seo_aeo_audit?.check_title !== false);
+        $('#plugin-seo-check-meta-desc').prop('checked', plugins.seo_aeo_audit?.check_meta_description !== false);
+        $('#plugin-seo-check-canonical').prop('checked', plugins.seo_aeo_audit?.check_canonical !== false);
+        $('#plugin-seo-check-h1').prop('checked', plugins.seo_aeo_audit?.check_h1_tags !== false);
+        $('#plugin-seo-check-alt').prop('checked', plugins.seo_aeo_audit?.check_alt_text !== false);
+        $('#plugin-seo-check-json-ld').prop('checked', plugins.seo_aeo_audit?.check_json_ld !== false);
+        $('#plugin-seo-check-og').prop('checked', plugins.seo_aeo_audit?.check_open_graph !== false);
+        $('#plugin-seo-check-twitter').prop('checked', plugins.seo_aeo_audit?.check_twitter_cards !== false);
+        $('#plugin-seo-check-robots').prop('checked', plugins.seo_aeo_audit?.check_robots_txt !== false);
+        $('#plugin-seo-check-sitemap').prop('checked', plugins.seo_aeo_audit?.check_sitemap_xml !== false);
+        $('#plugin-seo-check-language').prop('checked', plugins.seo_aeo_audit?.check_language_tag !== false);
+        $('#plugin-seo-check-links').prop('checked', plugins.seo_aeo_audit?.check_links !== false);
+        $('#plugin-seo-alt-coverage').val(plugins.seo_aeo_audit?.min_alt_coverage_percent || 100);
+        $('#plugin-seo-title-min').val(plugins.seo_aeo_audit?.optimal_title_length_min || 50);
+        $('#plugin-seo-title-max').val(plugins.seo_aeo_audit?.optimal_title_length_max || 60);
+        $('#plugin-seo-desc-min').val(plugins.seo_aeo_audit?.optimal_description_length_min || 150);
+        
+        // Viewports
+        $('#viewport-small-width').val(config.viewport_sizes?.small?.width || 320);
+        $('#viewport-small-height').val(config.viewport_sizes?.small?.height || 450);
+        $('#viewport-medium-width').val(config.viewport_sizes?.medium?.width || 1280);
+        $('#viewport-medium-height').val(config.viewport_sizes?.medium?.height || 800);
+        
+        // Advanced
+        $('#config-user-agent').val(config.user_agent || 'Mozilla/5.0 (compatible; Centralised Web Accessibility Checkerbot/1.0)');
+        $('#config-json').val(JSON.stringify(config, null, 2));
+        
+        // Show modal and switch to Basic tab
+        const modal = new bootstrap.Modal(document.getElementById('configModal'));
+        modal.show();
+        
+        // Switch to Basic tab
+        const basicTab = new bootstrap.Tab(document.getElementById('basic-tab'));
+        basicTab.show();
+    }).fail(function() {
+        alert('Failed to load configuration details');
+    });
+}
+
+function saveConfig() {
+    const filenameInput = $('#config-filename').val().trim();
+    if (!filenameInput) {
+        alert('Please enter a configuration name');
+        return;
+    }
+    
+    // Build filename
+    let filename = filenameInput;
+    if (!filename.startsWith('config_')) {
+        filename = 'config_' + filename;
+    }
+    if (!filename.endsWith('.json')) {
+        filename = filename + '.json';
+    }
+    
+    // Build configuration object
+    let config = {};
+    
+    // Check if user manually edited the JSON (only if they're on the advanced tab and made changes)
+    const jsonText = $('#config-json').val().trim();
+    const isAdvancedTabActive = $('#advanced-tab').hasClass('active');
+    const jsonWasManuallyEdited = $('#config-json').data('manually-edited');
+    
+    if (jsonText && isAdvancedTabActive && jsonWasManuallyEdited) {
+        try {
+            config = JSON.parse(jsonText);
+        } catch (e) {
+            alert('Invalid JSON in advanced settings. Please fix or clear it.');
+            return;
+        }
+    } else {
+        // Build from all form fields across all tabs
+        config = {
+            audit_name: $('#config-audit-name').val(),
+            headless: $('#config-headless').is(':checked'),
+            max_links_per_domain: parseInt($('#config-max-links').val()),
+            thread_count: parseInt($('#config-thread-count').val()),
+            browser: $('#config-browser').val(),
+            chrome_binary_location: 'auto',
+            chrome_driver_location: 'auto',
+            user_agent: $('#config-user-agent').val(),
+            user_agent_product_token: 'CWACbot',  // REQUIRED: Bot identifier
+            follow_robots_txt: $('#config-follow-robots').is(':checked'),
+            script_timeout: parseFloat($('#config-script-timeout').val()),
+            page_load_timeout: parseFloat($('#config-page-timeout').val()),
+            delay_between_page_loads: parseFloat($('#config-delay-pages').val()),
+            delay_between_viewports: parseFloat($('#config-delay-viewports').val()),
+            delay_after_page_load: parseFloat($('#config-delay-after-load').val()),
+            only_allow_https: $('#config-https-only').is(':checked'),
+            perform_header_check: $('#config-perform-header').is(':checked'),
+            shuffle_base_urls: $('#config-shuffle-urls').is(':checked'),
+            base_urls_visit_path: './base_urls/visit/',
+            base_urls_nohead_path: './base_urls/nohead/',
+            record_unexpected_response_codes: $('#config-record-response-codes').is(':checked'),
+            force_open_details_elements: $('#config-force-details').is(':checked'),
+            filter_to_organisations: [],
+            filter_to_urls: [],
+            viewport_sizes: {
+                small: {
+                    width: parseInt($('#viewport-small-width').val()),
+                    height: parseInt($('#viewport-small-height').val())
+                },
+                medium: {
+                    width: parseInt($('#viewport-medium-width').val()),
+                    height: parseInt($('#viewport-medium-height').val())
+                }
+            },
+            audit_plugins: {
+                axe_core_audit: {
+                    class_name: 'AxeCoreAudit',
+                    'best-practice': $('#plugin-axe-best-practice').is(':checked'),
+                    enabled: $('#plugin-axe-enabled').is(':checked')
+                },
+                language_audit: {
+                    class_name: 'LanguageAudit',
+                    enabled: $('#plugin-language-enabled').is(':checked'),
+                    run_sentiment_analysis: $('#plugin-language-sentiment').is(':checked')
+                },
+                reflow_audit: {
+                    class_name: 'ReflowAudit',
+                    enabled: $('#plugin-reflow-enabled').is(':checked'),
+                    viewport_to_test: $('#plugin-reflow-viewport').val(),
+                    screenshot_failures: $('#plugin-reflow-screenshot').is(':checked')
+                },
+                focus_indicator_audit: {
+                    class_name: 'FocusIndicatorAudit',
+                    enabled: $('#plugin-focus-enabled').is(':checked'),
+                    root_element_css_selector: $('#plugin-focus-selector').val(),
+                    pre_tab_key_presses: parseInt($('#plugin-focus-pre-tabs').val()),
+                    max_tab_key_presses: parseInt($('#plugin-focus-max-tabs').val())
+                },
+                screenshot_audit: {
+                    class_name: 'ScreenshotAudit',
+                    enabled: $('#plugin-screenshot-enabled').is(':checked')
+                },
+                element_audit: {
+                    class_name: 'ElementAudit',
+                    target_element_css_selector: $('#plugin-element-selector').val(),
+                    enabled: $('#plugin-element-enabled').is(':checked')
+                },
+                seo_aeo_audit: {
+                    class_name: 'SeoAeoAudit',
+                    enabled: $('#plugin-seo-enabled').is(':checked'),
+                    check_title: $('#plugin-seo-check-title').is(':checked'),
+                    check_meta_description: $('#plugin-seo-check-meta-desc').is(':checked'),
+                    check_canonical: $('#plugin-seo-check-canonical').is(':checked'),
+                    check_h1_tags: $('#plugin-seo-check-h1').is(':checked'),
+                    check_alt_text: $('#plugin-seo-check-alt').is(':checked'),
+                    check_json_ld: $('#plugin-seo-check-json-ld').is(':checked'),
+                    check_open_graph: $('#plugin-seo-check-og').is(':checked'),
+                    check_twitter_cards: $('#plugin-seo-check-twitter').is(':checked'),
+                    check_robots_txt: $('#plugin-seo-check-robots').is(':checked'),
+                    check_sitemap_xml: $('#plugin-seo-check-sitemap').is(':checked'),
+                    check_language_tag: $('#plugin-seo-check-language').is(':checked'),
+                    check_links: $('#plugin-seo-check-links').is(':checked'),
+                    schema_types_to_detect: ['FAQPage', 'HowTo', 'Article', 'Product', 'Organization', 'WebSite', 'Speakable'],
+                    min_alt_coverage_percent: parseInt($('#plugin-seo-alt-coverage').val()),
+                    optimal_title_length_min: parseInt($('#plugin-seo-title-min').val()),
+                    optimal_title_length_max: parseInt($('#plugin-seo-title-max').val()),
+                    optimal_description_length_min: parseInt($('#plugin-seo-desc-min').val()),
+                    optimal_description_length_max: 160
+                }
+            }
+        };
+    }
+    
+    // Determine if creating or updating
+    const isEditing = editingConfigFilename !== null;
+    const url = isEditing ? `/api/scan/configs/${editingConfigFilename}` : '/api/scan/configs';
+    const method = isEditing ? 'PUT' : 'POST';
+    
+    const data = isEditing ? {config: config} : {filename: filename, config: config};
+    
+    $.ajax({
+        url: url,
+        method: method,
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function(response) {
+            if (response.success) {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('configModal'));
+                modal.hide();
+                loadConfigurations();
+                alert('Configuration saved successfully');
+            }
+        },
+        error: function(xhr) {
+            alert('Failed to save configuration: ' + (xhr.responseJSON?.error || 'Unknown error'));
+        }
+    });
+}
+
+function deleteConfig(filename) {
+    const protectedConfigs = ['config_default.json', 'config_wcag22_aa.json', 'config_test.json'];
+    if (protectedConfigs.includes(filename)) {
+        alert('Cannot delete protected configuration');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete ${filename}?\nThis action cannot be undone.`)) {
+        return;
+    }
+    
+    $.ajax({
+        url: `/api/scan/configs/${filename}`,
+        method: 'DELETE',
+        success: function(response) {
+            if (response.success) {
+                loadConfigurations();
+                alert('Configuration deleted successfully');
+            }
+        },
+        error: function(xhr) {
+            alert('Failed to delete configuration: ' + (xhr.responseJSON?.error || 'Unknown error'));
+        }
+    });
+}
+
+// ==================== SCHEDULE MANAGEMENT ====================
+
+function loadSchedules() {
+    $.get('/api/schedules', function(data) {
+        const tbody = $('#schedules-tbody');
+        
+        if (!data.schedules || data.schedules.length === 0) {
+            tbody.html('<tr><td colspan="6" class="text-center text-muted">No scheduled scans configured</td></tr>');
+            return;
+        }
+        
+        const html = data.schedules.map(schedule => {
+            const statusBadge = schedule.enabled ? 
+                '<span class="badge bg-success">Active</span>' : 
+                '<span class="badge bg-secondary">Paused</span>';
+            
+            const lastRun = schedule.last_run ? 
+                new Date(schedule.last_run).toLocaleString() : 
+                '<span class="text-muted">Never</span>';
+            
+            const nextRun = schedule.next_run ? 
+                new Date(schedule.next_run).toLocaleString() : 
+                '<span class="text-muted">—</span>';
+            
+            const scheduleDesc = formatScheduleDescription(schedule.schedule_type, schedule.schedule_value);
+            
+            return `
+                <tr>
+                    <td><strong>${schedule.config_name}</strong></td>
+                    <td>${scheduleDesc}</td>
+                    <td>${lastRun}</td>
+                    <td>${nextRun}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="editSchedule(${schedule.id})" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-${schedule.enabled ? 'warning' : 'success'}" 
+                                onclick="toggleSchedule(${schedule.id})" 
+                                title="${schedule.enabled ? 'Pause' : 'Resume'}">
+                            <i class="bi bi-${schedule.enabled ? 'pause' : 'play'}-fill"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteSchedule(${schedule.id})" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.html(html);
+    }).fail(function() {
+        $('#schedules-tbody').html('<tr><td colspan="6" class="text-center text-danger">Error loading schedules</td></tr>');
+    });
+}
+
+function formatScheduleDescription(type, value) {
+    switch(type) {
+        case 'hourly':
+            return `Every ${value} hour(s)`;
+        case 'daily':
+            return `Daily at ${value}`;
+        case 'weekly':
+            const [day, time] = value.split(',');
+            return `Weekly on ${day.charAt(0).toUpperCase() + day.slice(1)} at ${time}`;
+        case 'monthly':
+            const [dayNum, monthTime] = value.split(',');
+            return `Monthly on day ${dayNum} at ${monthTime}`;
+        case 'cron':
+            return `Cron: ${value}`;
+        default:
+            return value;
+    }
+}
+
+function showAddScheduleModal() {
+    $('#scheduleModalTitle').text('Add Scheduled Scan');
+    $('#schedule-id').val('');
+    $('#scheduleForm')[0].reset();
+    $('#schedule-enabled').prop('checked', true);
+    
+    // Load configurations into select
+    $.get('/api/scan/configs', function(configs) {
+        const select = $('#schedule-config');
+        select.html('<option value="">Select a configuration...</option>');
+        
+        configs.forEach(config => {
+            const option = $('<option></option>')
+                .val(config.filename)
+                .text(config.name)
+                .data('path', 'config/' + config.filename);
+            select.append(option);
+        });
+    });
+    
+    $('#scheduleModal').modal('show');
+}
+
+function updateScheduleValueInput() {
+    const type = $('#schedule-type').val();
+    const input = $('#schedule-value');
+    const help = $('#schedule-value-help');
+    
+    input.val('');
+    
+    switch(type) {
+        case 'hourly':
+            input.attr('type', 'number');
+            input.attr('placeholder', '1');
+            input.attr('min', '1');
+            input.attr('max', '24');
+            help.text('Number of hours between scans (1-24)');
+            break;
+        case 'daily':
+            input.attr('type', 'time');
+            input.attr('placeholder', '09:00');
+            input.removeAttr('min max');
+            help.text('Time of day to run (24-hour format, e.g., 09:00)');
+            break;
+        case 'weekly':
+            input.attr('type', 'text');
+            input.attr('placeholder', 'monday,09:00');
+            input.removeAttr('min max');
+            help.text('Format: day,HH:MM (e.g., monday,09:00)');
+            break;
+        case 'monthly':
+            input.attr('type', 'text');
+            input.attr('placeholder', '1,09:00');
+            input.removeAttr('min max');
+            help.text('Format: day,HH:MM (e.g., 1,09:00 for 1st of month at 9am)');
+            break;
+        case 'cron':
+            input.attr('type', 'text');
+            input.attr('placeholder', '0 9 * * *');
+            input.removeAttr('min max');
+            help.text('Cron expression (e.g., "0 9 * * *" for 9am daily)');
+            break;
+        default:
+            help.text('Select a schedule type first');
+    }
+}
+
+function saveSchedule() {
+    const scheduleId = $('#schedule-id').val();
+    const configFilename = $('#schedule-config').val();
+    const configName = $('#schedule-config option:selected').text();
+    const configPath = $('#schedule-config option:selected').data('path');
+    const scheduleType = $('#schedule-type').val();
+    const scheduleValue = $('#schedule-value').val();
+    const enabled = $('#schedule-enabled').is(':checked');
+    
+    if (!configFilename || !scheduleType || !scheduleValue) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    const data = {
+        config_name: configName,
+        config_path: configPath,
+        schedule_type: scheduleType,
+        schedule_value: scheduleValue,
+        enabled: enabled
+    };
+    
+    const url = scheduleId ? `/api/schedules/${scheduleId}` : '/api/schedules';
+    const method = scheduleId ? 'PUT' : 'POST';
+    
+    $.ajax({
+        url: url,
+        method: method,
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function(response) {
+            if (response.success) {
+                $('#scheduleModal').modal('hide');
+                loadSchedules();
+                const action = scheduleId ? 'updated' : 'created';
+                alert(`Schedule ${action} successfully!`);
+            } else {
+                alert('Error saving schedule: ' + (response.error || 'Unknown error'));
+            }
+        },
+        error: function(xhr) {
+            alert('Error saving schedule: ' + (xhr.responseJSON?.error || 'Network error'));
+        }
+    });
+}
+
+function editSchedule(scheduleId) {
+    $.get('/api/schedules', function(data) {
+        const schedule = data.schedules.find(s => s.id === scheduleId);
+        if (!schedule) {
+            alert('Schedule not found');
+            return;
+        }
+        
+        $('#scheduleModalTitle').text('Edit Scheduled Scan');
+        $('#schedule-id').val(schedule.id);
+        
+        // Load configurations
+        $.get('/api/scan/configs', function(configs) {
+            const select = $('#schedule-config');
+            select.html('<option value="">Select a configuration...</option>');
+            
+            configs.forEach(config => {
+                const option = $('<option></option>')
+                    .val(config.filename)
+                    .text(config.name)
+                    .data('path', 'config/' + config.filename);
+                select.append(option);
+            });
+            
+            // Set selected config
+            const configFilename = schedule.config_path.replace('config/', '');
+            select.val(configFilename);
+        });
+        
+        $('#schedule-type').val(schedule.schedule_type);
+        updateScheduleValueInput();
+        $('#schedule-value').val(schedule.schedule_value);
+        $('#schedule-enabled').prop('checked', schedule.enabled);
+        
+        $('#scheduleModal').modal('show');
+    });
+}
+
+function toggleSchedule(scheduleId) {
+    if (confirm('Toggle this scheduled scan?')) {
+        $.post(`/api/schedules/${scheduleId}/toggle`, function(response) {
+            if (response.success) {
+                loadSchedules();
+            } else {
+                alert('Error toggling schedule: ' + (response.error || 'Unknown error'));
+            }
+        }).fail(function() {
+            alert('Error toggling schedule');
+        });
+    }
+}
+
+function deleteSchedule(scheduleId) {
+    if (confirm('Are you sure you want to delete this scheduled scan?')) {
+        $.ajax({
+            url: `/api/schedules/${scheduleId}`,
+            method: 'DELETE',
+            success: function(response) {
+                if (response.success) {
+                    loadSchedules();
+                    alert('Schedule deleted successfully');
+                } else {
+                    alert('Error deleting schedule: ' + (response.error || 'Unknown error'));
+                }
+            },
+            error: function() {
+                alert('Error deleting schedule');
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

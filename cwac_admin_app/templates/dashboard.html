@@ -1,0 +1,547 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}Dashboard - Centralised Web Accessibility Checker{% endblock %}
+{% block page_title %}<i class="bi bi-speedometer2"></i> Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+.metric-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    height: 100%;
+    border: 1px solid #e0e0e0;
+}
+.metric-card.highlighted {
+    border: 2px solid #4a90e2;
+}
+.metric-title {
+    font-size: 0.875rem;
+    color: #666;
+    margin-bottom: 0.5rem;
+}
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #333;
+    margin: 0;
+}
+.metric-subtitle {
+    font-size: 0.875rem;
+    color: #666;
+    margin-top: 0.25rem;
+}
+.metric-trend {
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+}
+.metric-trend.up {
+    color: #10b981;
+}
+.metric-trend.down {
+    color: #ef4444;
+}
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+.section-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e0e0e0;
+}
+.section-header h5 {
+    margin: 0;
+    font-weight: 600;
+    color: #333;
+}
+.section-header i {
+    margin-right: 0.5rem;
+    color: #4a90e2;
+}
+.scan-activity-container {
+    min-height: 300px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 2rem;
+}
+.scan-activity-container > div {
+    width: 100%;
+}
+.scan-activity-empty {
+    text-align: center;
+    color: #999;
+    padding: 2rem 0;
+}
+.scan-activity-empty i {
+    font-size: 3rem;
+    color: #ddd;
+    margin-bottom: 1rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Accessibility Leaderboard (Top 3) -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5><i class="bi bi-trophy"></i> Accessibility Leaderboard - Top 3</h5>
+            </div>
+            <div class="card-body">
+                <div id="leaderboard-container">
+                    <div class="text-center text-muted">Loading leaderboard...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Accessibility Score Trends Chart -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="metric-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h6><i class="bi bi-universal-access"></i> Accessibility Score Trends</h6>
+                    <p class="text-muted small mb-0">Average accessibility scores across last 10 scans</p>
+                </div>
+                <div>
+                    <select id="accessibility-site-filter" class="form-select form-select-sm">
+                        <option value="all">All Sites</option>
+                    </select>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="scoreTrendsChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Scheduled Scan Activity -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="metric-card">
+            <h6><i class="bi bi-clock-history"></i> Scheduled Scans</h6>
+            <p class="text-muted small mb-3">Upcoming scheduled scans</p>
+            <div id="scheduled-scans-container">
+                <div class="text-center text-muted">Loading scheduled scans...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Global chart instances
+let scoreTrendsChart;
+
+// Store all data for filtering
+let accessibilityData = null;
+
+// Global color palette for consistent site colors across all charts
+const SITE_COLOR_PALETTE = [
+    { border: '#4a90e2', bg: 'rgba(74, 144, 226, 0.1)' },   // Blue
+    { border: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },   // Green
+    { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },   // Amber
+    { border: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },    // Red
+    { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },   // Purple
+    { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)' },   // Pink
+    { border: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },    // Cyan
+    { border: '#f97316', bg: 'rgba(249, 115, 22, 0.1)' },   // Orange
+    { border: '#84cc16', bg: 'rgba(132, 204, 22, 0.1)' },   // Lime
+    { border: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)' }    // Violet
+];
+
+// Map to store site name to color assignments
+let siteColorMap = new Map();
+
+// Function to get consistent color for a site
+function getSiteColor(siteName) {
+    if (!siteColorMap.has(siteName)) {
+        // Assign next available color
+        const colorIndex = siteColorMap.size % SITE_COLOR_PALETTE.length;
+        siteColorMap.set(siteName, SITE_COLOR_PALETTE[colorIndex]);
+    }
+    return siteColorMap.get(siteName);
+}
+
+$(document).ready(function() {
+    loadDashboardMetrics();
+    initializeCharts();
+    loadScheduledScans();
+    
+    // Refresh metrics every 30 seconds
+    setInterval(loadDashboardMetrics, 30000);
+    setInterval(loadScheduledScans, 60000);  // Refresh scheduled scans every minute
+    
+    // Setup filter change handlers
+    $('#accessibility-site-filter').on('change', function() {
+        updateAccessibilityChart($(this).val());
+    });
+});
+
+function loadDashboardMetrics() {
+    // Load leaderboard (top 3 only)
+    $.get('/api/dashboard/leaderboard?limit=3', function(data) {
+        renderLeaderboard(data);
+    }).fail(function() {
+        $('#leaderboard-container').html('<div class="text-center text-muted">Failed to load leaderboard</div>');
+    });
+    
+    // Load accessibility metrics with trends
+    $.get('/api/dashboard/accessibility-metrics', function(data) {
+        accessibilityData = data;
+        updateAccessibilityChart('all');
+        populateAccessibilitySiteFilter(data.score_trends);
+    });
+}
+
+function loadScheduledScans() {
+    $.get('/api/schedules', function(data) {
+        renderScheduledScans(data.schedules || []);
+    }).fail(function() {
+        $('#scheduled-scans-container').html('<div class="text-center text-muted">Failed to load scheduled scans</div>');
+    });
+}
+
+function loadActiveScanActivity() {
+    // Load scan activity separately for frequent updates
+    $.get('/api/dashboard/scan-activity', function(data) {
+        if (data.active_scans && data.active_scans.length > 0) {
+            renderScanActivity(data.active_scans);
+            
+            // Continue polling if there are active scans
+            if (!activeScanPollingInterval) {
+                activeScanPollingInterval = setInterval(loadActiveScanActivity, 5000);
+            }
+        } else {
+            $('#scan-activity').html(`
+                <div class="scan-activity-empty">
+                    <i class="bi bi-activity"></i>
+                    <p>No scan activity</p>
+                </div>
+            `);
+            
+            // Stop polling if no active scans (save resources)
+            // But keep checking every 30 seconds via main metrics load
+        }
+    }).fail(function() {
+        console.error('Failed to load scan activity');
+    });
+}
+
+function renderLeaderboard(data) {
+    if (data.length === 0) {
+        $('#leaderboard-container').html('<div class="text-center text-muted">No sites have been scanned yet</div>');
+        return;
+    }
+    
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Organization</th>
+                        <th>Score</th>
+                        <th>Compliance Level</th>
+                        <th>Issues</th>
+                        <th>Status</th>
+                        <th>Last Scan</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    data.forEach((site, index) => {
+        const rank = index + 1;
+        const rankBadge = rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉';
+        
+        const statusBadge = {
+            'compliant': '<span class="badge bg-success">Compliant ✓</span>',
+            'needs_work': '<span class="badge bg-warning">Needs Work</span>',
+            'failing': '<span class="badge bg-danger">Failing ✗</span>'
+        }[site.status] || '<span class="badge bg-secondary">Unknown</span>';
+        
+        const scoreClass = site.score >= 85 ? 'text-success' : site.score >= 70 ? 'text-warning' : 'text-danger';
+        
+        html += `
+            <tr>
+                <td><strong>${rankBadge}</strong></td>
+                <td>
+                    <strong>${site.organisation}</strong>
+                    <br><small class="text-muted">${site.url}</small>
+                </td>
+                <td class="${scoreClass}"><strong>${site.score}%</strong></td>
+                <td><span class="badge bg-primary">${site.compliance_level || 'N/A'}</span></td>
+                <td>
+                    ${site.critical_issues > 0 ? `<span class="badge bg-danger">${site.critical_issues} critical</span>` : ''}
+                    ${site.serious_issues > 0 ? `<span class="badge bg-warning">${site.serious_issues} serious</span>` : ''}
+                    ${site.total_issues > 0 ? `<span class="badge bg-info">${site.total_issues} total</span>` : '<span class="badge bg-success">0</span>'}
+                </td>
+                <td>${statusBadge}</td>
+                <td><small>${site.last_scan ? new Date(site.last_scan).toLocaleDateString() : 'Never'}</small></td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    $('#leaderboard-container').html(html);
+}
+
+function renderScanActivity(scans) {
+    if (scans.length === 0) {
+        $('#scan-activity').html(`
+            <div class="scan-activity-empty">
+                <i class="bi bi-activity"></i>
+                <p>No scan activity</p>
+            </div>
+        `);
+        return;
+    }
+    
+    let html = '';
+    scans.forEach(scan => {
+        const progressClass = {
+            'starting': 'info',
+            'running': 'primary',
+            'completed': 'success',
+            'error': 'danger',
+            'cancelled': 'warning'
+        }[scan.status] || 'secondary';
+        
+        const statusBadgeText = scan.status === 'running' ? 'running' : scan.status;
+        
+        html += `
+            <div class="mb-3 p-3 border rounded">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold">Scan ${scan.id.substring(0, 8)}...</span>
+                    <span class="badge bg-${progressClass}">${statusBadgeText}</span>
+                </div>
+                <div class="progress mb-2" style="height: 25px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-${progressClass}" 
+                         role="progressbar" 
+                         style="width: ${scan.progress}%"
+                         aria-valuenow="${scan.progress}" 
+                         aria-valuemin="0" 
+                         aria-valuemax="100">
+                        ${scan.progress}%
+                    </div>
+                </div>
+                <div class="small text-muted mb-2">${scan.message || 'Processing...'}</div>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-danger" onclick="stopScan('${scan.id}')">
+                        <i class="bi bi-stop-fill"></i> Stop
+                    </button>
+                    <button class="btn btn-sm btn-info ms-2" onclick="viewScanDetails('${scan.id}')">
+                        <i class="bi bi-info-circle"></i> Details
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    $('#scan-activity').html(html);
+}
+
+function stopScan(scanId) {
+    if (confirm('Are you sure you want to stop this scan?')) {
+        $.post(`/api/scan/stop/${scanId}`, function(response) {
+            if (response.success) {
+                showToast('Scan stopped', 'success');
+                loadDashboardMetrics(); // Reload to update scan activity
+            } else {
+                showToast('Failed to stop scan', 'error');
+            }
+        }).fail(function() {
+            showToast('Error stopping scan', 'error');
+        });
+    }
+}
+
+function viewScanDetails(scanId) {
+    $.get(`/api/scan/progress/${scanId}`, function(progress) {
+        const details = `
+            Scan ID: ${scanId}
+            Status: ${progress.status || 'unknown'}
+            Progress: ${progress.progress || 0}%
+            Message: ${progress.message || 'No message'}
+            ${progress.start_time ? '\nStarted: ' + new Date(progress.start_time).toLocaleString() : ''}
+        `;
+        alert(details);
+    }).fail(function() {
+        alert('Could not load scan details.');
+    });
+}
+
+function showToast(message, type = 'info') {
+    // Simple toast notification (can be enhanced with Bootstrap Toast)
+    const bgClass = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : 'bg-info';
+    const toast = $(`
+        <div class="position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+            <div class="toast show ${bgClass} text-white" role="alert">
+                <div class="toast-body">
+                    ${message}
+                </div>
+            </div>
+        </div>
+    `);
+    $('body').append(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function renderScheduledScans(schedules) {
+    if (!schedules || schedules.length === 0) {
+        $('#scheduled-scans-container').html('<div class="text-center text-muted">No scheduled scans configured</div>');
+        return;
+    }
+    
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-hover table-sm">
+                <thead>
+                    <tr>
+                        <th>Configuration</th>
+                        <th>Schedule</th>
+                        <th>Next Run</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    schedules.forEach(schedule => {
+        const statusBadge = schedule.enabled ? 
+            '<span class="badge bg-success"><i class="bi bi-check-circle"></i> Active</span>' : 
+            '<span class="badge bg-secondary"><i class="bi bi-pause-circle"></i> Paused</span>';
+        
+        const nextRun = schedule.next_run ? 
+            new Date(schedule.next_run).toLocaleString() : 
+            '<span class="text-muted">Not scheduled</span>';
+        
+        html += `
+            <tr>
+                <td><strong>${schedule.config_name}</strong></td>
+                <td><small>${schedule.schedule_type}: ${schedule.schedule_value}</small></td>
+                <td>${nextRun}</td>
+                <td>${statusBadge}</td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    $('#scheduled-scans-container').html(html);
+}
+
+function initializeCharts() {
+    // Accessibility Score Trends Chart
+    const ctx1 = document.getElementById('scoreTrendsChart').getContext('2d');
+    scoreTrendsChart = new Chart(ctx1, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: []
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { 
+                    display: true,
+                    position: 'bottom'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Accessibility Score'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function populateAccessibilitySiteFilter(data) {
+    if (!data || !data.sites) return;
+    
+    const filter = $('#accessibility-site-filter');
+    filter.find('option:not(:first)').remove();
+    
+    for (const siteName of Object.keys(data.sites)) {
+        filter.append(`<option value="${siteName}">${siteName}</option>`);
+    }
+}
+
+
+function updateAccessibilityChart(selectedSite) {
+    if (!accessibilityData || !accessibilityData.score_trends) return;
+    
+    const data = accessibilityData.score_trends;
+    
+    scoreTrendsChart.data.labels = data.labels || [];
+    scoreTrendsChart.data.datasets = [];
+    
+    if (selectedSite === 'all') {
+        // Show all sites
+        for (const [siteName, scores] of Object.entries(data.sites || {})) {
+            const color = getSiteColor(siteName);
+            scoreTrendsChart.data.datasets.push({
+                label: siteName,
+                data: scores,
+                borderColor: color.border,
+                backgroundColor: color.bg,
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true
+            });
+        }
+    } else {
+        // Show only selected site
+        if (data.sites && data.sites[selectedSite]) {
+            const color = getSiteColor(selectedSite);
+            scoreTrendsChart.data.datasets.push({
+                label: selectedSite,
+                data: data.sites[selectedSite],
+                borderColor: color.border,
+                backgroundColor: color.bg,
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true
+            });
+        }
+    }
+    
+    scoreTrendsChart.update();
+}
+
+function updateScoreTrendsChart(data) {
+    // Deprecated - use updateAccessibilityChart instead
+    updateAccessibilityChart('all');
+}
+</script>
+{% endblock %}

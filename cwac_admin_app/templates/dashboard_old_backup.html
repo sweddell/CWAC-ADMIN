@@ -1,0 +1,273 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}Dashboard - Centralised Web Accessibility Checker{% endblock %}
+{% block page_title %}<i class="bi bi-speedometer2"></i> Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <!-- Sites Card -->
+    <div class="col-md-4">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-globe"></i> Total Sites
+                </h5>
+                <p class="card-text display-4" id="total-sites">0</p>
+                <a href="/sites" class="btn btn-light">Manage Sites</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Scans Card -->
+    <div class="col-md-4">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-clock-history"></i> Recent Scans
+                </h5>
+                <p class="card-text display-4" id="recent-scans">0</p>
+                <a href="/results" class="btn btn-light">View Results</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Scan Card -->
+    <div class="col-md-4">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-lightning"></i> Quick Actions
+                </h5>
+                <div class="d-grid gap-2 mt-3">
+                    <a href="/scan" class="btn btn-light">Start Scan</a>
+                    <button class="btn btn-light" onclick="runQuickScan()">Quick Test</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Accessibility Leaderboard -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5><i class="bi bi-trophy"></i> Accessibility Leaderboard</h5>
+            </div>
+            <div class="card-body">
+                <div id="leaderboard-container">
+                    <div class="text-center text-muted">Loading leaderboard...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- System Status -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5><i class="bi bi-cpu"></i> System Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>Chrome Driver:</strong> 
+                        <span class="badge bg-success">Ready</span>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Python Environment:</strong> 
+                        <span class="badge bg-success">Active</span>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Configuration:</strong> 
+                        <span class="badge bg-success">Loaded</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<style>
+.hover-shadow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+</style>
+<script>
+// Helper function to format time ago
+function getTimeAgo(date) {
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+    
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return Math.floor(seconds / 60) + ' min ago';
+    if (seconds < 86400) return Math.floor(seconds / 3600) + ' hours ago';
+    if (seconds < 604800) return Math.floor(seconds / 86400) + ' days ago';
+    return date.toLocaleDateString();
+}
+
+// Load dashboard data
+$(document).ready(function() {
+    loadDashboardData();
+    
+    // Refresh every 30 seconds
+    setInterval(loadDashboardData, 30000);
+});
+
+function loadDashboardData() {
+    // Load sites count
+    $.get('/api/sites', function(data) {
+        $('#total-sites').text(data.length);
+    });
+    
+    
+    // Load recent results count
+    $.get('/api/results', function(data) {
+        $('#recent-scans').text(data.length);
+    });
+    
+    // Load leaderboard
+    $.get('/api/leaderboard', function(data) {
+        if (data.length === 0) {
+            $('#leaderboard-container').html('<div class="text-center text-muted">No sites have been scanned yet</div>');
+        } else {
+            let html = `
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Organization</th>
+                                <th>Score</th>
+                                <th>Compliance Level</th>
+                                <th>Issues</th>
+                                <th>Status</th>
+                                <th>Last Scan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            data.forEach((site, index) => {
+                const rank = index + 1;
+                let rankBadge = '';
+                if (rank === 1) rankBadge = '🥇';
+                else if (rank === 2) rankBadge = '🥈';
+                else if (rank === 3) rankBadge = '🥉';
+                else rankBadge = `#${rank}`;
+                
+                const statusBadge = {
+                    'compliant': '<span class="badge bg-success">Compliant ✓</span>',
+                    'needs_work': '<span class="badge bg-warning">Needs Work</span>',
+                    'failing': '<span class="badge bg-danger">Failing ✗</span>'
+                }[site.status] || '<span class="badge bg-secondary">Unknown</span>';
+                
+                const scoreClass = site.score >= 85 ? 'text-success' : site.score >= 70 ? 'text-warning' : 'text-danger';
+                
+                // Determine compliance level badge with cascading levels
+                let complianceBadge = '';
+                const compliance = site.compliance_level;
+                
+                if (typeof compliance === 'object' && compliance.primary_level) {
+                    // New format with cascading levels
+                    const primary = compliance.primary_level;
+                    const levels = compliance.compliant_levels || [];
+                    
+                    if (primary === 'WCAG 2.2 AAA') {
+                        complianceBadge = '<span class="badge bg-success">WCAG 2.2 AAA</span>';
+                    } else if (primary === 'WCAG 2.2 AA') {
+                        complianceBadge = '<span class="badge bg-success">WCAG 2.2 AA</span>';
+                    } else if (primary === 'WCAG 2.2 A') {
+                        complianceBadge = '<span class="badge bg-warning">WCAG 2.2 A</span>';
+                    } else {
+                        complianceBadge = '<span class="badge bg-danger">Non-compliant</span>';
+                    }
+                    
+                    // Add cascading levels tooltip
+                    if (levels.length > 0) {
+                        const tooltip = levels.join(', ');
+                        complianceBadge = `
+                            <span class="badge bg-primary" data-bs-toggle="tooltip" title="${tooltip}">
+                                ${primary.replace('WCAG ', '')}
+                            </span>
+                            <br><small class="text-muted" style="font-size: 0.7em;">
+                                Also meets: ${levels.filter(l => l !== primary).map(l => l.replace('WCAG ', '')).join(', ')}
+                            </small>
+                        `;
+                    }
+                } else {
+                    // Legacy string format
+                    if (compliance === 'WCAG 2.2 AAA') {
+                        complianceBadge = '<span class="badge bg-success">AAA</span>';
+                    } else if (compliance === 'WCAG 2.2 AA') {
+                        complianceBadge = '<span class="badge bg-success">AA</span>';
+                    } else if (compliance === 'WCAG 2.2 A') {
+                        complianceBadge = '<span class="badge bg-warning">A</span>';
+                    } else {
+                        complianceBadge = '<span class="badge bg-danger">None</span>';
+                    }
+                }
+                
+                html += `
+                    <tr>
+                        <td><strong>${rankBadge}</strong></td>
+                        <td>
+                            <strong>${site.organisation}</strong>
+                            <br><small class="text-muted">${site.url}</small>
+                        </td>
+                        <td class="${scoreClass}"><strong>${site.score}%</strong></td>
+                        <td>${complianceBadge}</td>
+                        <td>
+                            ${site.critical_issues > 0 ? `<span class="badge bg-danger">${site.critical_issues} critical</span>` : ''}
+                            ${site.serious_issues > 0 ? `<span class="badge bg-warning">${site.serious_issues} serious</span>` : ''}
+                            ${site.total_issues > 0 ? `<span class="badge bg-info">${site.total_issues} total</span>` : '<span class="badge bg-success">0</span>'}
+                        </td>
+                        <td>${statusBadge}</td>
+                        <td><small>${site.last_scan ? new Date(site.last_scan).toLocaleDateString() : 'Never'}</small></td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            $('#leaderboard-container').html(html);
+        }
+    }).fail(function() {
+        $('#leaderboard-container').html('<div class="text-center text-muted">Failed to load leaderboard</div>');
+    });
+}
+
+function runQuickScan() {
+    if (confirm('Run a quick accessibility scan on example.com?')) {
+        $.ajax({
+            url: '/api/scan/start',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                config: 'config_test.json'
+            }),
+            success: function(response) {
+                if (response.success) {
+                    alert('Scan started! Check the Scan page for progress.');
+                    window.location.href = '/scan';
+                }
+            },
+            error: function(xhr, status, error) {
+                alert('Failed to start scan: ' + (xhr.responseJSON?.error || error));
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

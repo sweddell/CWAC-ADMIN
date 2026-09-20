@@ -1,0 +1,202 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.manifest
+*.spec
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+.virtualenv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Codeium
+.codeiumignore
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Application Specific
+# Database files (regenerated on startup)
+cwac_analytics.db
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Logs
+logs/
+*.log
+
+# Scan results (user data, can be large)
+results/*/
+!results/.gitkeep
+
+# Cookies and session data
+cookies.txt
+*.cookies
+
+# User data
+admin/users.json
+admin/*.backup
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# Chrome/Chromium (browsers downloaded via download_chrome.py)
+chrome/
+!chrome/.gitkeep
+chrome_debug.log
+chromedriver.log
+chromedriver_*/
+*.crx
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Compiled source
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Packages
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Node (if any frontend tooling is added)
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+package-lock.json
+yarn.lock
+
+# Flask
+instance/
+.webassets-cache
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# SQLite databases (keep schema, not data)
+*.sqlite
+*.sqlite3
+cwac_admin_app/database/bi_integration/*.db
+!cwac_admin_app/database/bi_integration/schema.sql
+
+# CWAC Scanner (GPL v3 - installed separately via install_cwac.sh)
+# The cwac/ directory is a clone of https://github.com/GOVTNZ/cwac and is
+# not part of this codebase — see README.md for licensing details.
+cwac/
+
+# Deployment
+*.deploy
+.deployment
+nltk_data/
+
+# Working/temporary documentation files
+*_FIXES.md
+*_NOTES.md
+WORKING_*.md
+drivers/chromedriver*

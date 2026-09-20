@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CWAC - Centralised Web Accessibility Checker{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        .sidebar {
+            background: #000000;
+            min-height: 100vh;
+            color: white;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 250px;
+            z-index: 100;
+            transition: all 0.3s;
+        }
+        .sidebar-collapsed {
+            width: 70px;
+        }
+        .sidebar .logo-section {
+            padding: 1.5rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .sidebar .logo-section h5 {
+            margin-top: 0.5rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .sidebar-collapsed .logo-section h5 {
+            display: none;
+        }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.9);
+            padding: 0.75rem 1.5rem;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+            display: flex;
+            align-items: center;
+        }
+        .sidebar .nav-link:hover {
+            color: white;
+            background: rgba(255,255,255,0.1);
+            border-left-color: white;
+        }
+        .sidebar .nav-link.active {
+            color: white;
+            background: rgba(255,255,255,0.2);
+            border-left-color: white;
+        }
+        .sidebar .nav-link i {
+            font-size: 1.2rem;
+            width: 24px;
+            margin-right: 0.75rem;
+        }
+        .sidebar-collapsed .nav-link {
+            padding: 0.75rem;
+            justify-content: center;
+        }
+        .sidebar-collapsed .nav-link i {
+            margin-right: 0;
+        }
+        .sidebar-collapsed .nav-link span {
+            display: none;
+        }
+        .main-content {
+            margin-left: 250px;
+            padding: 0;
+            transition: all 0.3s;
+            width: calc(100% - 250px);
+            min-height: 100vh;
+        }
+        .main-content-expanded {
+            margin-left: 70px;
+            width: calc(100% - 70px);
+        }
+        .top-bar {
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .top-bar h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            color: #333;
+        }
+        .user-section {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            padding: 1rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .user-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 0.75rem;
+        }
+        .sidebar-collapsed .user-info {
+            justify-content: center;
+        }
+        .sidebar-collapsed .user-avatar {
+            margin-right: 0;
+        }
+        .sidebar-collapsed .user-details {
+            display: none;
+        }
+        .content-wrapper {
+            padding: 1.5rem;
+            width: 100%;
+            max-width: 100%;
+        }
+        /* Ensure all content uses full width */
+        .content-wrapper .row {
+            margin-left: 0;
+            margin-right: 0;
+        }
+        .content-wrapper .col,
+        .content-wrapper [class*="col-"] {
+            padding-left: 15px;
+            padding-right: 15px;
+        }
+        .content-wrapper .table-responsive {
+            width: 100%;
+        }
+        .content-wrapper .card {
+            width: 100%;
+        }
+        .stats-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+        }
+        .stats-card h3 {
+            font-size: 2rem;
+            margin: 0;
+            color: #667eea;
+        }
+        .stats-card p {
+            margin: 0.5rem 0 0 0;
+            color: #666;
+        }
+        .toggle-sidebar {
+            cursor: pointer;
+            color: #666;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+            }
+            .main-content-expanded {
+                margin-left: 0;
+                width: 100%;
+            }
+        }
+        
+        /* Ensure full width for large screens */
+        @media (min-width: 1400px) {
+            .content-wrapper {
+                padding: 2rem;
+            }
+        }
+        .table-container {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="d-flex">
+        <!-- Sidebar -->
+        <nav class="sidebar" id="sidebar">
+            <div class="logo-section">
+                <!-- CWAC Gradient Circle Logo -->
+                <svg width="48" height="48" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="16" cy="16" r="16" fill="url(#sidebarLogoGradient)"/>
+                    <path d="M21 12l-6 6-3-3" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <defs>
+                        <linearGradient id="sidebarLogoGradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                            <stop offset="0%" stop-color="#E91E63"/>
+                            <stop offset="50%" stop-color="#9C27B0"/>
+                            <stop offset="100%" stop-color="#00BCD4"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <h5>CWAC</h5>
+                <small style="font-size: 0.7rem; opacity: 0.85;">Accessibility Checker</small>
+            </div>
+            
+            <ul class="nav flex-column mt-3">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">
+                        <i class="bi bi-speedometer2"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'sites' %}active{% endif %}" href="{{ url_for('sites') }}">
+                        <i class="bi bi-globe"></i>
+                        <span>Sites</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'scan' %}active{% endif %}" href="{{ url_for('scan') }}">
+                        <i class="bi bi-search"></i>
+                        <span>Scan</span>
+                    </a>
+                </li>
+                
+                <hr class="my-2" style="border-color: rgba(255,255,255,0.2);">
+                
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">
+                        <i class="bi bi-person-gear"></i>
+                        <span>Profile</span>
+                    </a>
+                </li>
+                {% if current_user.is_admin %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'user_management' %}active{% endif %}" href="{{ url_for('user_management') }}">
+                        <i class="bi bi-people"></i>
+                        <span>User Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'system_status' %}active{% endif %}" href="{{ url_for('system_status') }}">
+                        <i class="bi bi-cpu"></i>
+                        <span>System Status</span>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+            
+            <div class="user-section">
+                <div class="user-info">
+                    <div class="user-avatar">
+                        <i class="bi bi-person-fill"></i>
+                    </div>
+                    <div class="user-details">
+                        <div class="text-white small">Logged in as</div>
+                        <div class="fw-bold">{{ current_user.username }}</div>
+                    </div>
+                </div>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('profile') }}" class="btn btn-sm btn-outline-light">
+                        <i class="bi bi-person-gear"></i>
+                        <span class="sidebar-text"> Profile</span>
+                    </a>
+                    <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light">
+                        <i class="bi bi-box-arrow-right"></i>
+                        <span class="sidebar-text"> Logout</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content" id="mainContent">
+            <div class="top-bar">
+                <div class="d-flex align-items-center">
+                    <span class="toggle-sidebar me-3" onclick="toggleSidebar()">
+                        <i class="bi bi-list" style="font-size: 1.5rem;"></i>
+                    </span>
+                    <div>
+                        <h1 class="mb-0">{% block page_title %}Dashboard{% endblock %}</h1>
+                        {% block page_description %}{% endblock %}
+                    </div>
+                </div>
+                <div class="d-flex align-items-center">
+                    {% block top_actions %}
+                    <button class="btn btn-sm btn-outline-primary" onclick="location.reload()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                    {% endblock %}
+                </div>
+            </div>
+            
+            <div class="content-wrapper">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                {% block content %}{% endblock %}
+            </div>
+
+            <footer class="text-center text-muted mt-4 mb-2" style="font-size: 0.75rem;">
+                Powered by <a href="https://www.digital.govt.nz/standards-and-guidance/nz-government-web-standards/centralised-web-accessibility-checker-cwac" target="_blank" rel="noopener">CWAC</a>
+                &middot; <a href="https://github.com/GOVTNZ/cwac" target="_blank" rel="noopener"><i class="bi bi-github"></i> GOVTNZ/cwac</a>
+                &middot; Development assisted by Perplexity and Devin
+            </footer>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            sidebar.classList.toggle('sidebar-collapsed');
+            mainContent.classList.toggle('main-content-expanded');
+            
+            // Save state to localStorage
+            const isCollapsed = sidebar.classList.contains('sidebar-collapsed');
+            localStorage.setItem('sidebarCollapsed', isCollapsed);
+        }
+        
+        // Restore sidebar state on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            if (isCollapsed) {
+                document.getElementById('sidebar').classList.add('sidebar-collapsed');
+                document.getElementById('mainContent').classList.add('main-content-expanded');
+            }
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

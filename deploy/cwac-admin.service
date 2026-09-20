@@ -1,0 +1,21 @@
+[Unit]
+Description=CWAC-ADMIN Accessibility Platform
+After=network.target
+
+[Service]
+User=cwacadmin
+WorkingDirectory=/opt/cwac-admin/cwac_admin_app/app
+EnvironmentFile=/opt/cwac-admin/.env
+ExecStart=/opt/cwac-admin/.venv/bin/gunicorn \
+    --workers 2 \
+    --preload \
+    --bind 0.0.0.0:5100 \
+    --timeout 120 \
+    --access-logfile /opt/cwac-admin/logs/gunicorn-access.log \
+    --error-logfile /opt/cwac-admin/logs/gunicorn-error.log \
+    admin_app:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

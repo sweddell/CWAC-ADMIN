@@ -1,0 +1,458 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}Dashboard - Centralised Web Accessibility Checker{% endblock %}
+{% block page_title %}<i class="bi bi-speedometer2"></i> Dashboard{% endblock %}
+
+{% block content %}
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 id="totalSites">0</h3>
+                    <p>Total Sites</p>
+                </div>
+                <i class="bi bi-globe text-primary" style="font-size: 2rem;"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 id="totalScans" class="text-success">0</h3>
+                    <p>Total Scans</p>
+                </div>
+                <i class="bi bi-search text-success" style="font-size: 2rem;"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 id="avgScore" class="text-warning">0%</h3>
+                    <p>Average Score</p>
+                </div>
+                <i class="bi bi-speedometer2 text-warning" style="font-size: 2rem;"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 id="activeIssues" class="text-danger">0</h3>
+                    <p>Active Issues</p>
+                </div>
+                <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Status -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="table-container">
+            <h5 class="mb-3">
+                <i class="bi bi-activity"></i> System Status
+            </h5>
+            <div class="list-group">
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-server"></i> Scanner Service</span>
+                    <span class="badge bg-success" id="scannerStatus">Online</span>
+                </div>
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-database"></i> Database</span>
+                    <span class="badge bg-success" id="databaseStatus">Connected</span>
+                </div>
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-graph-up"></i> Analytics</span>
+                    <span class="badge bg-success" id="analyticsStatus">Active</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="table-container">
+            <h5 class="mb-3">
+                <i class="bi bi-clock-history"></i> Recent Activity
+            </h5>
+            <div id="recentActivity" class="list-group">
+                <div class="list-group-item">
+                    <small class="text-muted">Loading recent activity...</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="table-container">
+            <h5 class="mb-3">
+                <i class="bi bi-graph-up"></i> Compliance Trend
+            </h5>
+            <canvas id="complianceTrendChart" height="100"></canvas>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="table-container">
+            <h5 class="mb-3">
+                <i class="bi bi-pie-chart"></i> Issue Distribution
+            </h5>
+            <canvas id="issueDistributionChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Sites Overview Table -->
+<div class="table-container">
+    <h5 class="mb-3">
+        <i class="bi bi-list-ul"></i> Sites Overview
+    </h5>
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Site</th>
+                    <th>Organization</th>
+                    <th>Last Scan</th>
+                    <th>Score</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="sitesTableBody">
+                <tr>
+                    <td colspan="6" class="text-center text-muted">Loading sites...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Use minified Chart.js without source map to avoid console errors -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Load dashboard data
+async function loadDashboardData() {
+    try {
+        // Load sites
+        const sitesResponse = await fetch('/api/sites');
+        if (!sitesResponse.ok) {
+            throw new Error('Failed to load sites');
+        }
+        const sites = await sitesResponse.json();
+        document.getElementById('totalSites').textContent = sites.length || 0;
+        
+        // Load recent scans
+        let scans = [];
+        try {
+            const scansResponse = await fetch('/api/scans/recent');
+            if (scansResponse.ok) {
+                scans = await scansResponse.json();
+            }
+        } catch (scanError) {
+            console.warn('Could not load recent scans:', scanError);
+            scans = [];
+        }
+        
+        document.getElementById('totalScans').textContent = scans.length || 0;
+        
+        // Calculate average score
+        if (scans.length > 0) {
+            const avgScore = scans.reduce((sum, scan) => sum + (scan.score || 0), 0) / scans.length;
+            document.getElementById('avgScore').textContent = Math.round(avgScore) + '%';
+        } else {
+            document.getElementById('avgScore').textContent = '0%';
+        }
+        
+        // Count active issues
+        const totalIssues = scans.reduce((sum, scan) => sum + (scan.total_issues || 0), 0);
+        document.getElementById('activeIssues').textContent = totalIssues || 0;
+        
+        // Update sites table
+        updateSitesTable(sites, scans);
+        
+        // Update charts
+        updateCharts(scans);
+        
+        // Update recent activity
+        updateRecentActivity(scans);
+        
+    } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        // Show error in UI
+        document.getElementById('sitesTableBody').innerHTML = 
+            '<tr><td colspan="6" class="text-center text-danger">Error loading data. Please refresh the page.</td></tr>';
+    }
+}
+
+function updateSitesTable(sites, scans) {
+    const tbody = document.getElementById('sitesTableBody');
+    
+    if (sites.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No sites configured</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = sites.map(site => {
+        // Find latest scan for this site
+        const siteScan = scans.find(scan => scan.site_url === site.url);
+        
+        return `
+            <tr>
+                <td><a href="${site.url}" target="_blank">${site.url}</a></td>
+                <td>${site.organisation || '-'}</td>
+                <td>${siteScan ? new Date(siteScan.scan_date).toLocaleDateString() : 'Never'}</td>
+                <td>
+                    ${siteScan ? `<span class="badge bg-${getScoreBadgeClass(siteScan.score)}">${siteScan.score}%</span>` : '-'}
+                </td>
+                <td>
+                    ${siteScan ? `<span class="badge bg-${siteScan.score >= 90 ? 'success' : 'warning'}">
+                        ${siteScan.score >= 90 ? 'Compliant' : 'Issues Found'}</span>` : 
+                        '<span class="badge bg-secondary">Not Scanned</span>'}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="scanSite('${site.url}')">
+                        <i class="bi bi-play"></i> Scan
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Store previous data to check if update is needed
+let previousChartData = {
+    dates: [],
+    scores: [],
+    issues: {}
+};
+
+// Flag to prevent multiple chart updates
+let chartsUpdating = false;
+
+function updateCharts(scans) {
+    // Prevent multiple simultaneous updates
+    if (chartsUpdating) return;
+    chartsUpdating = true;
+    
+    // Defer chart creation to next tick to avoid blocking
+    setTimeout(() => {
+        createCharts(scans);
+        chartsUpdating = false;
+    }, 0);
+}
+
+function createCharts(scans) {
+    // Compliance Trend Chart
+    const ctx1 = document.getElementById('complianceTrendChart');
+    if (!ctx1) return;
+    
+    // Destroy existing chart if it exists
+    if (window.complianceChart) {
+        window.complianceChart.destroy();
+        window.complianceChart = null;
+    }
+    
+    // Group scans by date
+    const scansByDate = {};
+    scans.forEach(scan => {
+        if (scan.scan_date) {
+            const date = new Date(scan.scan_date).toLocaleDateString();
+            if (!scansByDate[date]) {
+                scansByDate[date] = [];
+            }
+            scansByDate[date].push(scan.score || 0);
+        }
+    });
+    
+    const dates = Object.keys(scansByDate).sort().slice(-7); // Last 7 days
+    
+    // If no data, show placeholder
+    if (dates.length === 0) {
+        dates.push(new Date().toLocaleDateString());
+        scansByDate[dates[0]] = [0];
+    }
+    
+    const avgScores = dates.map(date => {
+        const scores = scansByDate[date];
+        return scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+    });
+    
+    // Create chart with minimal options for better performance
+    window.complianceChart = new Chart(ctx1.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'Average Score',
+                data: avgScores,
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 3,
+                pointHoverRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,  // Disable all animations for better performance
+            interaction: {
+                intersect: false,
+                mode: 'point'
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    enabled: true,
+                    animation: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Issue Distribution Chart
+    const ctx2 = document.getElementById('issueDistributionChart');
+    if (!ctx2) return;
+    
+    // Destroy existing chart if it exists
+    if (window.issueChart) {
+        window.issueChart.destroy();
+        window.issueChart = null;
+    }
+    
+    let critical = 0, serious = 0, moderate = 0, minor = 0;
+    scans.forEach(scan => {
+        critical += scan.critical_issues || 0;
+        serious += scan.serious_issues || 0;
+        moderate += scan.moderate_issues || 0;
+        minor += scan.minor_issues || 0;
+    });
+    
+    // If all zeros, show placeholder data
+    if (critical === 0 && serious === 0 && moderate === 0 && minor === 0) {
+        minor = 1; // Show at least something in the chart
+    }
+    
+    // Create chart with minimal options
+    window.issueChart = new Chart(ctx2.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Critical', 'Serious', 'Moderate', 'Minor'],
+            datasets: [{
+                data: [critical, serious, moderate, minor],
+                backgroundColor: [
+                    '#dc3545',
+                    '#fd7e14',
+                    '#ffc107',
+                    '#6c757d'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,  // Disable all animations
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    enabled: true,
+                    animation: false
+                }
+            }
+        }
+    });
+}
+
+function updateRecentActivity(scans) {
+    const activityDiv = document.getElementById('recentActivity');
+    
+    const recentScans = scans.slice(0, 5);
+    
+    if (recentScans.length === 0) {
+        activityDiv.innerHTML = '<div class="list-group-item"><small class="text-muted">No recent activity</small></div>';
+        return;
+    }
+    
+    activityDiv.innerHTML = recentScans.map(scan => `
+        <div class="list-group-item">
+            <div class="d-flex justify-content-between">
+                <small><strong>${scan.site_url}</strong></small>
+                <small class="text-muted">${new Date(scan.scan_date).toLocaleString()}</small>
+            </div>
+            <small class="text-muted">Score: ${scan.score}% | Issues: ${scan.total_issues}</small>
+        </div>
+    `).join('');
+}
+
+function getScoreBadgeClass(score) {
+    if (score >= 90) return 'success';
+    if (score >= 70) return 'warning';
+    return 'danger';
+}
+
+function scanSite(url) {
+    window.location.href = `/scan?site=${encodeURIComponent(url)}`;
+}
+
+// Debounce function to prevent excessive updates
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Create debounced version of loadDashboardData
+const debouncedLoadData = debounce(loadDashboardData, 500);
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', () => {
+    // Use requestIdleCallback for initial load if available
+    if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => {
+            loadDashboardData();
+        });
+    } else {
+        // Fallback to setTimeout
+        setTimeout(loadDashboardData, 100);
+    }
+});
+
+// Refresh data every 60 seconds (less frequent updates)
+setInterval(debouncedLoadData, 60000);
+
+// Removed canvas optimization that was causing issues
+</script>
+{% endblock %}

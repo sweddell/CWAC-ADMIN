@@ -1,0 +1,230 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}Profile - Centralised Web Accessibility Checker{% endblock %}
+{% block page_title %}<i class="bi bi-person-circle"></i> Profile Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Profile Information -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-person-circle"></i> Profile Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('update_profile') }}">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                <input type="text" class="form-control" id="username" value="{{ current_user.username }}" disabled>
+                            </div>
+                            <small class="text-muted">Username cannot be changed</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">Email Address</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       value="{{ current_user.email or '' }}" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="organization" class="form-label">Organization</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-building"></i></span>
+                                <input type="text" class="form-control" id="organization" name="organization" 
+                                       value="{{ current_user.organization or '' }}" required>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="role" class="form-label">Role</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-briefcase"></i></span>
+                                <input type="text" class="form-control" id="role" value="{% if current_user.is_admin %}Administrator{% else %}User{% endif %}" disabled>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="bio" class="form-label">Bio / About</label>
+                        <textarea class="form-control" id="bio" name="bio" rows="3" 
+                                  placeholder="Tell us about yourself...">{{ current_user.bio if current_user.bio else '' }}</textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Update Profile
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Change Password -->
+        <div class="card mb-4">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="bi bi-key"></i> Change Password
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('change_password') }}">
+                    <div class="mb-3">
+                        <label for="current_password" class="form-label">Current Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                            <input type="password" class="form-control" id="current_password" name="current_password" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="new_password" class="form-label">New Password</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
+                                <input type="password" class="form-control" id="new_password" name="new_password" 
+                                       required minlength="8">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="confirm_password" class="form-label">Confirm New Password</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
+                                <input type="password" class="form-control" id="confirm_password" name="confirm_password" 
+                                       required minlength="8">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> Password must be at least 8 characters long and include uppercase, lowercase, numbers, and special characters.
+                    </div>
+                    
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-key"></i> Change Password
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <!-- Account Information -->
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-info-circle"></i> Account Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Account Status:</strong>
+                    <span class="badge bg-success ms-2">{{ current_user.status|title }}</span>
+                </div>
+                <div class="mb-3">
+                    <strong>Account Type:</strong>
+                    {% if current_user.is_admin %}
+                    <span class="badge bg-danger ms-2">Administrator</span>
+                    {% else %}
+                    <span class="badge bg-secondary ms-2">Standard User</span>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <strong>Member Since:</strong>
+                    <div class="text-muted">{{ current_user.registered_date|default('Unknown', true) }}</div>
+                </div>
+                <div class="mb-3">
+                    <strong>User ID:</strong>
+                    <div class="text-muted">{{ current_user.id }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Security Settings -->
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-shield-check"></i> Security Settings
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="twoFactorAuth" disabled>
+                    <label class="form-check-label" for="twoFactorAuth">
+                        Two-Factor Authentication
+                        <small class="text-muted d-block">Coming soon</small>
+                    </label>
+                </div>
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="emailNotifications" disabled>
+                    <label class="form-check-label" for="emailNotifications">
+                        Email Notifications
+                        <small class="text-muted d-block">Coming soon</small>
+                    </label>
+                </div>
+                <hr>
+                <div class="d-grid">
+                    <button class="btn btn-outline-secondary btn-sm" disabled>
+                        <i class="bi bi-clock-history"></i> View Login History
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Danger Zone -->
+        {% if not current_user.is_admin %}
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-exclamation-triangle"></i> Danger Zone
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Once you delete your account, there is no going back. Please be certain.</p>
+                <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure you want to delete your account? This action cannot be undone.')">
+                    <i class="bi bi-trash"></i> Delete Account
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Password validation
+    $('form[action*="change_password"]').on('submit', function(e) {
+        const newPassword = $('#new_password').val();
+        const confirmPassword = $('#confirm_password').val();
+        
+        if (newPassword !== confirmPassword) {
+            e.preventDefault();
+            alert('New passwords do not match!');
+            return false;
+        }
+        
+        // Check password strength
+        const hasUpperCase = /[A-Z]/.test(newPassword);
+        const hasLowerCase = /[a-z]/.test(newPassword);
+        const hasNumbers = /\d/.test(newPassword);
+        const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
+        
+        if (!hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecialChar) {
+            e.preventDefault();
+            alert('Password must include uppercase and lowercase letters, numbers, and special characters!');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}
